@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, X, Settings, Sword, Wand2, Shield, Crosshair, Book, Heart, RefreshCw } from 'lucide-react';
+import { Menu, X, Settings, Sword, Wand2, Shield, Crosshair, Book, Heart, RefreshCw, Camera } from 'lucide-react';
 
 export default function DMTable() {
   // Core state
@@ -10,13 +10,14 @@ export default function DMTable() {
   const [numPlayers, setNumPlayers] = useState(0);
   const [selectedCharacters, setSelectedCharacters] = useState([]);
   const [activePlayer, setActivePlayer] = useState(1);
+  const [pendingRoll, setPendingRoll] = useState(null); // {stat, dc, action, player}
+  const [isWaitingForPhysicalRoll, setIsWaitingForPhysicalRoll] = useState(false); // <-- ADD THIS STATE
   
   // Chat state
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState('');
-  const [pendingRoll, setPendingRoll] = useState(null); // {stat, dc, action}
   const [suggestions, setSuggestions] = useState([]);
   
   const updateCharacterCurrency = (playerNum, gold = 0, silver = 0, copper = 0) => {
@@ -51,6 +52,7 @@ export default function DMTable() {
   // Data
   const [campaigns, setCampaigns] = useState([]);
   const messagesEndRef = useRef(null);
+  const pollIntervalRef = useRef(null);
 
   const campaignTemplates = [
     { id: 'tavern', name: 'The Tavern Mystery', starter: "You awaken in a dimly lit tavern, the smell of ale and smoke thick in the air. A hooded figure in the corner watches you intently." },
@@ -245,6 +247,8 @@ DM Response (plain text, under 500 chars):`
         const stat = rollMatch[1].toLowerCase();
         const dc = parseInt(rollMatch[2]);
         setPendingRoll({ stat, dc, action: userMessage, player: currentPlayer });
+      } else {
+        setPendingRoll(null); // Good practice to clear if no roll is needed
       }
 
       // Extract suggestions
@@ -317,13 +321,111 @@ DM Response (plain text, under 500 chars):`
       setIsLoading(false);
     }
   };
+const triggerPhysicalRoll = async () => { // Make function async
+    if (!pendingRoll || isLoading) return;
+
+    setIsWaitingForPhysicalRoll(true);
+    setMessages(prev => [...prev, `⏳ Requesting physical dice roll for ${pendingRoll.stat.toUpperCase()} check (DC ${pendingRoll.dc})...`]);
+    setIsLoading(true);
+
+    // --- NEW: Call the main server to trigger the Pi ---
+    try {
+      console.log("Sending request to server to trigger physical roll...");
+      const triggerResponse = await fetch("http://localhost:3001/api/request-physical-roll", {
+        method: 'POST',
+      });
+
+      if (!triggerResponse.ok) {
+         // Handle error if server couldn't trigger Pi
+         const errorData = await triggerResponse.json();
+         console.error("Failed to trigger physical roll:", errorData.error);
+         setMessages(prev => [...prev.filter(msg => !msg.startsWith('⏳')), `⚠️ Error: ${errorData.error || 'Could not start physical roll.'}`]);
+         setIsLoading(false);
+         setIsWaitingForPhysicalRoll(false);
+         return; // Stop here if trigger failed
+      }
+      console.log("Server acknowledged trigger request.");
+      // Update message slightly
+      setMessages(prev => prev.map(msg => msg.startsWith('⏳ Requesting') ? '⏳ Physical roll triggered. Waiting for result...' : msg));
+
+    } catch (error) {
+      console.error("Network error triggering physical roll:", error);
+      setMessages(prev => [...prev.filter(msg => !msg.startsWith('⏳')), `⚠️ Network Error: Could not request physical roll.`]);
+      setIsLoading(false);
+      setIsWaitingForPhysicalRoll(false);
+      return; // Stop here
+    }
+    // Clear any previous polling interval
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+    }
+
+    // Start Polling (This part remains the same as before)
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        console.log("Polling /api/get-last-roll...");
+        const response = await fetch("http://localhost:3001/api/get-last-roll");
+        // ... (rest of polling logic: check response, handle result or continue polling) ...
+        if (!response.ok) {
+           console.error("Polling error:", response.status); return;
+        }
+        const data = await response.json();
+        if (data.diceValue !== null) {
+          console.log("Received dice value:", data.diceValue);
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+          setIsLoading(false);
+          // Make sure the "Waiting..." message is removed correctly before processing
+          setMessages(prev => prev.filter(msg => !msg.startsWith('⏳')));
+          handlePhysicalRollResult(data.diceValue); // Process the received value
+        } else {
+           console.log("No dice value available yet...");
+        }
+      } catch (error) {
+        console.error("Error during polling:", error);
+        // Maybe stop polling on error
+      }
+    }, 2000);
+
+    // Polling Timeout (This part also remains the same)
+    setTimeout(() => {
+        if (pollIntervalRef.current) {
+            console.log("Polling timed out.");
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+            setIsLoading(false);
+            setIsWaitingForPhysicalRoll(false);
+             // Update message to show timeout
+            setMessages(prev => [...prev.filter(msg => !msg.startsWith('⏳')), "Physical roll timed out. Please try again or use digital roll."]);
+        }
+    }, 30000); // 30-second timeout
+  };
+
+  const handlePhysicalRollResult = (rollValue) => {
+    if (!pendingRoll) return; // Should not happen if called correctly, but good check
+
+    const { dc, action, player, stat } = pendingRoll; // Get all needed details
+    const playerLabel = player ? `Player ${player.playerNum} (${player.name})` : `Player ${activePlayer}`;
+
+    // Construct a message showing the physical result
+    const rollMessage = `🎲 Physical die result for ${playerLabel} (${stat.toUpperCase()} Check): ${rollValue}`;
+
+    // Update messages, clear waiting state, clear the pending roll request
+    setMessages(prev => [...prev.filter(msg => !msg.startsWith('⏳ Waiting for physical dice')), rollMessage]); // Remove waiting msg, add result
+    setIsWaitingForPhysicalRoll(false);
+    setPendingRoll(null);
+
+    // IMPORTANT: Send the raw physical roll value to resolveRoll.
+    // The AI will narrate the outcome based on this raw value vs the DC.
+    resolveRoll(rollValue, dc, action, player);
+  };
 
   const executeRoll = () => {
     if (!pendingRoll) return;
-    
+
     const { stat, dc, action, player } = pendingRoll;
     const d20 = Math.floor(Math.random() * 20) + 1;
-    
+
     // Get the modifier based on stat name
     const statMap = {
       'strength': 'str',
@@ -333,21 +435,21 @@ DM Response (plain text, under 500 chars):`
       'wisdom': 'wis',
       'charisma': 'cha'
     };
-    
-    const statKey = statMap[stat] || 'str';
+
+    const statKey = statMap[stat] || 'str'; // Default to str if stat name is weird
     const modifier = player ? player[statKey] : 0;
     const total = d20 + modifier;
-    
+
     const playerLabel = player ? `Player ${player.playerNum} (${player.name})` : `Player ${activePlayer}`;
     const rollMessage = `🎲 ${playerLabel} rolled ${d20} + ${modifier} = ${total} for ${stat.toUpperCase()}`;
-    
+
     setMessages(prev => [...prev, rollMessage]);
-    setPendingRoll(null);
-    
-    // Now get DM's response to the roll
+    setPendingRoll(null); // Clear the pending roll state AFTER getting details
+    setIsWaitingForPhysicalRoll(false); // Ensure waiting state is also reset
+
+    // Now get DM's response to the calculated roll total
     resolveRoll(total, dc, action, player);
   };
-
   const resolveRoll = async (total, dc, action, player) => {
     setIsLoading(true);
     setStreamingMessage('');
@@ -821,16 +923,34 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
               </div>
             )}
             
-            {/* Roll Button */}
-            {pendingRoll && (
-              <div className="flex justify-center">
-                <button
-                  onClick={executeRoll}
-                  className="px-8 py-4 text-xl font-bold rounded-lg transition-all hover:scale-110 animate-pulse"
-                  style={{ background: '#8b6f47', color: '#f4e4c1', border: '3px solid #6b5537', fontFamily: '"Cinzel", serif' }}>
-                  🎲 Roll {pendingRoll.stat.toUpperCase()} Check
-                </button>
-              </div>
+            {pendingRoll && !isWaitingForPhysicalRoll && (
+      <div className="flex justify-center items-center gap-4 mt-4"> {/* Container for both buttons */}
+
+        {/* Original Digital Roll Button */}
+        <button
+          onClick={executeRoll} // Calls the restored function
+          className="px-8 py-4 text-xl font-bold rounded-lg transition-all hover:scale-110"
+          style={{ background: '#8b6f47', color: '#f4e4c1', border: '3px solid #6b5537', fontFamily: '"Cinzel", serif' }}>
+          🎲 Roll {pendingRoll.stat.toUpperCase()} Check (Digital)
+        </button>
+
+        {/* Physical Roll Trigger Button */}
+        <button
+          onClick={triggerPhysicalRoll}
+          className="px-8 py-4 text-xl font-bold rounded-lg transition-all hover:scale-110 flex items-center gap-2"
+          style={{ background: '#4a90e2', color: '#ffffff', border: '3px solid #357ABD', fontFamily: '"Cinzel", serif' }}
+        >
+          <Camera size={24} />
+          Use Physical Dice
+        </button>
+
+      </div>
+    )}
+
+            {isWaitingForPhysicalRoll && (
+                <div className="text-center mt-4 text-lg font-semibold italic" style={{ fontFamily: '"Cinzel", serif', color: '#6b5537' }}>
+                    Waiting for physical dice input...
+                </div>
             )}
             
             <div ref={messagesEndRef} />

@@ -5,6 +5,10 @@ require('dotenv').config();
 
 const app = express();
 const PORT = 3001;
+const RASPBERRY_PI_IP = "10.72.6.3"; // <-- IMPORTANT: Replace this!
+const RASPBERRY_PI_PORT = 5000;
+let lastDiceResult = null;
+let lastDiceResultTimestamp = null;
 
 app.use(cors());
 // Increase the limit to allow for larger base64 image strings
@@ -121,7 +125,7 @@ app.post('/api/read-dice', async (req, res) => {
               {
                 type: 'text',
                 // Simple prompt focused on the task
-                text: 'Analyze the attached image which shows a standard polyhedral die (like d4, d6, d8, d10, d12, d20) after a roll. What number is showing face-up? Respond ONLY with the single number (as an integer). If you cannot clearly determine the number, respond with "null".',
+                text: 'Analyze the attached image which shows a standard polyhedral die (like d6 OR d20) after a roll. What number is showing face-up? If it is a d6, the number should only be from 1-6. Respond ONLY with the single number (as an integer). If you cannot clearly determine the number, respond with "null".',
               },
             ],
           },
@@ -156,15 +160,78 @@ app.post('/api/read-dice', async (req, res) => {
     console.log("Anthropic response processed. Determined dice value:", diceValue);
 
     if (diceValue !== null) {
+      lastDiceResult = diceValue;
+      lastDiceResultTimestamp = Date.now(); // Store when we got it
+      console.log(`Stored dice result: ${lastDiceResult}`);
       res.json({ diceValue: diceValue });
     } else {
       console.error('Could not determine dice value from image.');
+      lastDiceResult = null;
+      lastDiceResultTimestamp = null;
       res.status(400).json({ error: 'Could not determine dice value from image.' });
     }
 
   } catch (error) {
     console.error('Server error in /api/read-dice:', error);
+    lastDiceResult = null;
+    lastDiceResultTimestamp = null;
     res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+app.get('/api/get-last-roll', (req, res) => {
+  // Optional: Clear result if it's too old (e.g., > 30 seconds)
+  const MAX_AGE_MS = 30000;
+  if (lastDiceResultTimestamp && (Date.now() - lastDiceResultTimestamp > MAX_AGE_MS)) {
+      console.log("Clearing stale dice result.");
+      lastDiceResult = null;
+      lastDiceResultTimestamp = null;
+  }
+
+  if (lastDiceResult !== null) {
+    const resultToSend = lastDiceResult;
+    console.log(`Sending stored dice result: ${resultToSend}`);
+    // Clear the result immediately after sending it to the frontend
+    lastDiceResult = null;
+    lastDiceResultTimestamp = null;
+    res.json({ diceValue: resultToSend });
+  } else {
+    // No result ready yet
+    res.json({ diceValue: null });
+  }
+});
+
+app.post('/api/request-physical-roll', async (req, res) => {
+  if (!RASPBERRY_PI_IP || RASPBERRY_PI_IP === "YOUR_RASPBERRY_PI_IP_ADDRESS") {
+    console.error("Raspberry Pi IP address is not configured in server/index.js");
+    return res.status(500).json({ error: "Raspberry Pi trigger endpoint not configured on server." });
+  }
+
+  const piTriggerUrl = `http://${RASPBERRY_PI_IP}:${RASPBERRY_PI_PORT}/trigger-capture`;
+  console.log(`Sending trigger to Raspberry Pi at ${piTriggerUrl}`);
+
+  try {
+    // Send a POST request to the Pi's server
+    const piResponse = await fetch(piTriggerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}) // Send empty body, POST indicates the trigger
+    });
+
+    if (!piResponse.ok) {
+      // If the Pi server responds with an error
+      const errorText = await piResponse.text();
+      console.error(`Error triggering Raspberry Pi: ${piResponse.status} - ${errorText}`);
+      return res.status(500).json({ error: `Failed to trigger Raspberry Pi (${piResponse.status})` });
+    }
+
+    const piData = await piResponse.json();
+    console.log("Raspberry Pi response:", piData.message);
+    res.status(202).json({ message: "Physical roll process initiated." }); // Send 'Accepted' back to frontend
+
+  } catch (error) {
+    console.error('Error sending trigger request to Raspberry Pi:', error);
+    res.status(500).json({ error: 'Could not reach Raspberry Pi to trigger roll.' });
   }
 });
 
