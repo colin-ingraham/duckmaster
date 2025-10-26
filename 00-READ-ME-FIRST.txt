@@ -1,0 +1,53 @@
+================================================================================
+    DM TABLE GAME - AI-POWERED D&D ADVENTURE
+================================================================================
+
+CONGRATULATIONS! You've got everything you need to run this game locally.
+
+================================================================================
+    WHAT TO DO FIRST
+================================================================================
+
+1. Read START_HERE.md - Complete beginner's guide
+2. Install Node.js if you haven't: https://nodejs.org/
+3. Get an Anthropic API key: https://console.anthropic.com/
+4. Run the setup script OR follow manual setup steps
+5. Start playing!
+
+================================================================================
+    QUICK SETUP (RECOMMENDED)
+================================================================================
+
+WINDOWS:
+  1. Open Command Prompt in this folder
+  2. Run: setup.bat
+  3. Run: npm start
+
+MAC/LINUX:
+  1. Open Terminal in this folder
+  2. Run: chmod +x setup.sh && ./setup.sh
+  3. Run: npm start
+
+================================================================================
+    MANUAL SETUP
+================================================================================
+
+1. Install dependencies:
+   npm install
+
+2. Create .env file with your API key:
+   Copy .env.example to .env
+   Add: REACT_APP_ANTHROPIC_API_KEY=your_key_here
+
+3. Start the game:
+   npm start
+
+4. Browser opens automatically to http://localhost:3000
+
+================================================================================
+
+For full documentation, see START_HERE.md
+
+Have fun adventuring! 🎲⚔️🐉
+
+================================================================================
