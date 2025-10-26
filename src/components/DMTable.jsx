@@ -128,20 +128,11 @@ export default function DMTable() {
       const partyContext = selectedCharacters.map(c => `${c.name} (${c.class}, Player ${c.playerNum})`).join(', ');
       const stats = currentPlayer ? `STR:${currentPlayer.str} DEX:${currentPlayer.dex} CON:${currentPlayer.con} INT:${currentPlayer.int} WIS:${currentPlayer.wis} CHA:${currentPlayer.cha}` : '';
       
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-20250514",
-          max_tokens: 500,
-          stream: true,
-          messages: [{
-            role: "user",
-            content: `You are a D&D Dungeon Master. Stay in character. CRITICAL: Keep responses UNDER 500 characters total.
+// 1. Prepare the messages array for the backend
+      const messagesForBackend = [{
+        role: "user",
+        // Keep your existing prompt construction logic here
+        content: `You are a D&D Dungeon Master. Stay in character. CRITICAL: Keep responses UNDER 500 characters total.
 
 PARTY: ${partyContext}
 CAMPAIGN: ${selectedCampaign.name}
@@ -153,7 +144,7 @@ ${messages.slice(-3).join('\n')}
 ROLLING SYSTEM:
 When action needs a roll, ask: "Roll a [stat] check (DC [number])."
 - DC 5: Trivial
-- DC 10: Easy  
+- DC 10: Easy
 - DC 15: Moderate
 - DC 20: Hard
 - DC 25: Very Hard
@@ -202,7 +193,21 @@ If action doesn't need roll, respond normally with narrative.
 ${currentPlayer ? currentPlayer.name : `Player ${activePlayer}`}: "${userMessage}"
 
 DM Response (plain text, under 500 chars):`
-          }]
+      }];
+
+      // 2. Call your backend server instead of Anthropic directly
+      const response = await fetch("http://localhost:3001/api/chat", { // <-- CHANGED URL
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // REMOVED 'x-api-key' and 'anthropic-version' headers
+        },
+        // 3. Send the body structure the backend expects
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001", // Or your desired model
+          max_tokens: 500,                  // Or your desired max tokens
+          stream: true,                     // Keep streaming enabled
+          messages: messagesForBackend      // Pass the messages array
         })
       });
 
@@ -350,20 +355,10 @@ DM Response (plain text, under 500 chars):`
     try {
       const partyContext = selectedCharacters.map(c => `${c.name} (${c.class}, Player ${c.playerNum})`).join(', ');
       
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 500,
-          stream: true,
-          messages: [{
-            role: "user",
-            content: `You are a D&D Dungeon Master. Player rolled ${total} against DC ${dc} for action: "${action}". 
+      const messagesForBackend = [{
+        role: "user",
+        // Keep your existing roll resolution prompt logic here
+        content: `You are a D&D Dungeon Master. Player rolled ${total} against DC ${dc} for action: "${action}".
 
 CONTEXT:
 ${messages.slice(-5).join('\n')}
@@ -371,7 +366,7 @@ ${messages.slice(-5).join('\n')}
 Narrate outcome in plain text (under 500 chars):
 - Natural 1: Critical fail with consequences
 - Beat DC by 10+: Critical success
-- Beat DC by 5+: Good success  
+- Beat DC by 5+: Good success
 - Beat DC: Success
 - Miss by 1-4: Minor failure
 - Miss by 5+: Failure
@@ -383,7 +378,21 @@ WRITING STYLE:
 - Easy to read
 
 ${player ? player.name : `Player ${activePlayer}`}'s result:`
-          }]
+      }];
+
+      // 2. Call your backend server
+      const response = await fetch("http://localhost:3001/api/chat", { // <-- CHANGED URL
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // REMOVED 'x-api-key' and 'anthropic-version' headers
+        },
+        // 3. Send the body structure the backend expects
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001", // Or your desired model
+          max_tokens: 500,                  // Or your desired max tokens
+          stream: true,                     // Keep streaming enabled
+          messages: messagesForBackend      // Pass the messages array
         })
       });
 
