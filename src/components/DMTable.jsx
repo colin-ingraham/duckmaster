@@ -1,17 +1,16 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, X, Settings, Sword, Wand2, Shield, Crosshair, Book, Heart, RefreshCw, Camera } from 'lucide-react';
 
 export default function DMTable() {
   // Core state
-  const [page, setPage] = useState('setup'); // 'setup', 'game'
-  const [step, setStep] = useState(1); // 1=campaign, 2=players, 3=characters
+  const [page, setPage] = useState('setup');
+  const [step, setStep] = useState(1);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [numPlayers, setNumPlayers] = useState(0);
   const [selectedCharacters, setSelectedCharacters] = useState([]);
   const [activePlayer, setActivePlayer] = useState(1);
-  const [pendingRoll, setPendingRoll] = useState(null); // {stat, dc, action, player}
-  const [isWaitingForPhysicalRoll, setIsWaitingForPhysicalRoll] = useState(false); // <-- ADD THIS STATE
+  const [pendingRoll, setPendingRoll] = useState(null);
+  const [isWaitingForPhysicalRoll, setIsWaitingForPhysicalRoll] = useState(false);
   
   // Chat state
   const [messages, setMessages] = useState([]);
@@ -47,7 +46,6 @@ export default function DMTable() {
   const [showCharacterCard, setShowCharacterCard] = useState(false);
   const [selectedCharacterCard, setSelectedCharacterCard] = useState(null);
   const [sidebarTab, setSidebarTab] = useState('campaigns');
-  
   
   // Data
   const [campaigns, setCampaigns] = useState([]);
@@ -130,10 +128,8 @@ export default function DMTable() {
       const partyContext = selectedCharacters.map(c => `${c.name} (${c.class}, Player ${c.playerNum})`).join(', ');
       const stats = currentPlayer ? `STR:${currentPlayer.str} DEX:${currentPlayer.dex} CON:${currentPlayer.con} INT:${currentPlayer.int} WIS:${currentPlayer.wis} CHA:${currentPlayer.cha}` : '';
       
-// 1. Prepare the messages array for the backend
       const messagesForBackend = [{
         role: "user",
-        // Keep your existing prompt construction logic here
         content: `You are a D&D Dungeon Master. Stay in character. CRITICAL: Keep responses UNDER 500 characters total.
 
 PARTY: ${partyContext}
@@ -197,19 +193,16 @@ ${currentPlayer ? currentPlayer.name : `Player ${activePlayer}`}: "${userMessage
 DM Response (plain text, under 500 chars):`
       }];
 
-      // 2. Call your backend server instead of Anthropic directly
-      const response = await fetch("http://localhost:3001/api/chat", { // <-- CHANGED URL
+      const response = await fetch("http://localhost:3001/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // REMOVED 'x-api-key' and 'anthropic-version' headers
         },
-        // 3. Send the body structure the backend expects
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001", // Or your desired model
-          max_tokens: 500,                  // Or your desired max tokens
-          stream: true,                     // Keep streaming enabled
-          messages: messagesForBackend      // Pass the messages array
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 500,
+          stream: true,
+          messages: messagesForBackend
         })
       });
 
@@ -241,40 +234,35 @@ DM Response (plain text, under 500 chars):`
         }
       }
 
-      // Check if DM is asking for a roll
       const rollMatch = fullText.match(/Roll (?:a|an) (\w+) check \(DC (\d+)\)/i);
       if (rollMatch) {
         const stat = rollMatch[1].toLowerCase();
         const dc = parseInt(rollMatch[2]);
         setPendingRoll({ stat, dc, action: userMessage, player: currentPlayer });
       } else {
-        setPendingRoll(null); // Good practice to clear if no roll is needed
+        setPendingRoll(null);
       }
 
-      // Extract suggestions
       const suggestMatches = fullText.match(/\[SUGGEST\](.*?)\[\/SUGGEST\]/g);
       if (suggestMatches) {
         const extractedSuggestions = suggestMatches.map(match => 
           match.replace(/\[SUGGEST\]|\[\/SUGGEST\]/g, '').trim()
         );
         setSuggestions(extractedSuggestions);
-        // Remove suggestions from displayed text
         fullText = fullText.replace(/\[SUGGEST\].*?\[\/SUGGEST\]/g, '').trim();
       } else {
         setSuggestions([]);
       }
 
-      // Check for currency rewards and update inventory
       const currencyMatch = fullText.match(/\[([+\-])(\d+)\s*(gold|silver|copper)(?:,?\s*([+\-])(\d+)\s*(gold|silver|copper))*\]/gi);
       if (currencyMatch && currentPlayer) {
         let goldChange = 0, silverChange = 0, copperChange = 0;
         let receivedItems = [];
         
-        // Parse all currency mentions in brackets
         const fullMatch = fullText.match(/\[(.*?)\]/g);
         if (fullMatch) {
           fullMatch.forEach(bracket => {
-            const content = bracket.slice(1, -1); // Remove [ and ]
+            const content = bracket.slice(1, -1);
             const parts = content.split(',');
             
             parts.forEach(part => {
@@ -302,7 +290,7 @@ DM Response (plain text, under 500 chars):`
         
         if (receivedItems.length > 0) {
           updateCharacterCurrency(activePlayer, goldChange, silverChange, copperChange);
-          const systemMessage = `💰 ${currentPlayer.name} received: ${receivedItems.join(', ')}`;
+          const systemMessage = `${currentPlayer.name} received: ${receivedItems.join(', ')}`;
           setMessages(prev => [...prev, `Dungeon Master: ${fullText}`, systemMessage]);
           setStreamingMessage('');
           setIsLoading(false);
@@ -321,14 +309,14 @@ DM Response (plain text, under 500 chars):`
       setIsLoading(false);
     }
   };
-const triggerPhysicalRoll = async () => { // Make function async
+
+  const triggerPhysicalRoll = async () => {
     if (!pendingRoll || isLoading) return;
 
     setIsWaitingForPhysicalRoll(true);
-    setMessages(prev => [...prev, `⏳ Requesting physical dice roll for ${pendingRoll.stat.toUpperCase()} check (DC ${pendingRoll.dc})...`]);
+    setMessages(prev => [...prev, `Requesting physical dice roll for ${pendingRoll.stat.toUpperCase()} check (DC ${pendingRoll.dc})...`]);
     setIsLoading(true);
 
-    // --- NEW: Call the main server to trigger the Pi ---
     try {
       console.log("Sending request to server to trigger physical roll...");
       const triggerResponse = await fetch("http://localhost:3001/api/request-physical-roll", {
@@ -336,38 +324,35 @@ const triggerPhysicalRoll = async () => { // Make function async
       });
 
       if (!triggerResponse.ok) {
-         // Handle error if server couldn't trigger Pi
-         const errorData = await triggerResponse.json();
-         console.error("Failed to trigger physical roll:", errorData.error);
-         setMessages(prev => [...prev.filter(msg => !msg.startsWith('⏳')), `⚠️ Error: ${errorData.error || 'Could not start physical roll.'}`]);
-         setIsLoading(false);
-         setIsWaitingForPhysicalRoll(false);
-         return; // Stop here if trigger failed
+        const errorData = await triggerResponse.json();
+        console.error("Failed to trigger physical roll:", errorData.error);
+        setMessages(prev => [...prev.filter(msg => !msg.startsWith('⏳')), `Error: ${errorData.error || 'Could not start physical roll.'}`]);
+        setIsLoading(false);
+        setIsWaitingForPhysicalRoll(false);
+        return;
       }
       console.log("Server acknowledged trigger request.");
-      // Update message slightly
-      setMessages(prev => prev.map(msg => msg.startsWith('⏳ Requesting') ? '⏳ Physical roll triggered. Waiting for result...' : msg));
+      setMessages(prev => prev.map(msg => msg.startsWith('Requesting') ? 'Physical roll triggered. Waiting for result...' : msg));
 
     } catch (error) {
       console.error("Network error triggering physical roll:", error);
-      setMessages(prev => [...prev.filter(msg => !msg.startsWith('⏳')), `⚠️ Network Error: Could not request physical roll.`]);
+      setMessages(prev => [...prev.filter(msg => !msg.startsWith('⏳')), `Network Error: Could not request physical roll.`]);
       setIsLoading(false);
       setIsWaitingForPhysicalRoll(false);
-      return; // Stop here
+      return;
     }
-    // Clear any previous polling interval
+
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
     }
 
-    // Start Polling (This part remains the same as before)
     pollIntervalRef.current = setInterval(async () => {
       try {
         console.log("Polling /api/get-last-roll...");
         const response = await fetch("http://localhost:3001/api/get-last-roll");
-        // ... (rest of polling logic: check response, handle result or continue polling) ...
         if (!response.ok) {
-           console.error("Polling error:", response.status); return;
+          console.error("Polling error:", response.status);
+          return;
         }
         const data = await response.json();
         if (data.diceValue !== null) {
@@ -375,48 +360,40 @@ const triggerPhysicalRoll = async () => { // Make function async
           clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
           setIsLoading(false);
-          // Make sure the "Waiting..." message is removed correctly before processing
           setMessages(prev => prev.filter(msg => !msg.startsWith('⏳')));
-          handlePhysicalRollResult(data.diceValue); // Process the received value
+          handlePhysicalRollResult(data.diceValue);
         } else {
-           console.log("No dice value available yet...");
+          console.log("No dice value available yet...");
         }
       } catch (error) {
         console.error("Error during polling:", error);
-        // Maybe stop polling on error
       }
     }, 2000);
 
-    // Polling Timeout (This part also remains the same)
     setTimeout(() => {
-        if (pollIntervalRef.current) {
-            console.log("Polling timed out.");
-            clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
-            setIsLoading(false);
-            setIsWaitingForPhysicalRoll(false);
-             // Update message to show timeout
-            setMessages(prev => [...prev.filter(msg => !msg.startsWith('⏳')), "Physical roll timed out. Please try again or use digital roll."]);
-        }
-    }, 30000); // 30-second timeout
+      if (pollIntervalRef.current) {
+        console.log("Polling timed out.");
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+        setIsLoading(false);
+        setIsWaitingForPhysicalRoll(false);
+        setMessages(prev => [...prev.filter(msg => !msg.startsWith('⏳')), "Physical roll timed out. Please try again or use digital roll."]);
+      }
+    }, 30000);
   };
 
   const handlePhysicalRollResult = (rollValue) => {
-    if (!pendingRoll) return; // Should not happen if called correctly, but good check
+    if (!pendingRoll) return;
 
-    const { dc, action, player, stat } = pendingRoll; // Get all needed details
+    const { dc, action, player, stat } = pendingRoll;
     const playerLabel = player ? `Player ${player.playerNum} (${player.name})` : `Player ${activePlayer}`;
 
-    // Construct a message showing the physical result
-    const rollMessage = `🎲 Physical die result for ${playerLabel} (${stat.toUpperCase()} Check): ${rollValue}`;
+    const rollMessage = `Physical die result for ${playerLabel} (${stat.toUpperCase()} Check): ${rollValue}`;
 
-    // Update messages, clear waiting state, clear the pending roll request
-    setMessages(prev => [...prev.filter(msg => !msg.startsWith('⏳ Waiting for physical dice')), rollMessage]); // Remove waiting msg, add result
+    setMessages(prev => [...prev.filter(msg => !msg.startsWith('Waiting for physical dice')), rollMessage]);
     setIsWaitingForPhysicalRoll(false);
     setPendingRoll(null);
 
-    // IMPORTANT: Send the raw physical roll value to resolveRoll.
-    // The AI will narrate the outcome based on this raw value vs the DC.
     resolveRoll(rollValue, dc, action, player);
   };
 
@@ -426,7 +403,6 @@ const triggerPhysicalRoll = async () => { // Make function async
     const { stat, dc, action, player } = pendingRoll;
     const d20 = Math.floor(Math.random() * 20) + 1;
 
-    // Get the modifier based on stat name
     const statMap = {
       'strength': 'str',
       'dexterity': 'dex',
@@ -436,20 +412,20 @@ const triggerPhysicalRoll = async () => { // Make function async
       'charisma': 'cha'
     };
 
-    const statKey = statMap[stat] || 'str'; // Default to str if stat name is weird
+    const statKey = statMap[stat] || 'str';
     const modifier = player ? player[statKey] : 0;
     const total = d20 + modifier;
 
     const playerLabel = player ? `Player ${player.playerNum} (${player.name})` : `Player ${activePlayer}`;
-    const rollMessage = `🎲 ${playerLabel} rolled ${d20} + ${modifier} = ${total} for ${stat.toUpperCase()}`;
+    const rollMessage = `${playerLabel} rolled ${d20} + ${modifier} = ${total} for ${stat.toUpperCase()}`;
 
     setMessages(prev => [...prev, rollMessage]);
-    setPendingRoll(null); // Clear the pending roll state AFTER getting details
-    setIsWaitingForPhysicalRoll(false); // Ensure waiting state is also reset
+    setPendingRoll(null);
+    setIsWaitingForPhysicalRoll(false);
 
-    // Now get DM's response to the calculated roll total
     resolveRoll(total, dc, action, player);
   };
+
   const resolveRoll = async (total, dc, action, player) => {
     setIsLoading(true);
     setStreamingMessage('');
@@ -459,7 +435,6 @@ const triggerPhysicalRoll = async () => { // Make function async
       
       const messagesForBackend = [{
         role: "user",
-        // Keep your existing roll resolution prompt logic here
         content: `You are a D&D Dungeon Master. Player rolled ${total} against DC ${dc} for action: "${action}".
 
 CONTEXT:
@@ -482,19 +457,16 @@ WRITING STYLE:
 ${player ? player.name : `Player ${activePlayer}`}'s result:`
       }];
 
-      // 2. Call your backend server
-      const response = await fetch("http://localhost:3001/api/chat", { // <-- CHANGED URL
+      const response = await fetch("http://localhost:3001/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // REMOVED 'x-api-key' and 'anthropic-version' headers
         },
-        // 3. Send the body structure the backend expects
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001", // Or your desired model
-          max_tokens: 500,                  // Or your desired max tokens
-          stream: true,                     // Keep streaming enabled
-          messages: messagesForBackend      // Pass the messages array
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 500,
+          stream: true,
+          messages: messagesForBackend
         })
       });
 
@@ -539,16 +511,12 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
   // Setup Page
   if (page === 'setup') {
     return (
-      <div className="w-full h-screen flex items-center justify-center"
-           style={{
-             background: 'linear-gradient(to bottom, #f4e4c1, #e8d4a0)',
-             backgroundImage: `repeating-linear-gradient(0deg, rgba(139, 101, 63, 0.03) 0px, transparent 1px, transparent 2px, rgba(139, 101, 63, 0.03) 3px), linear-gradient(to bottom, #f4e4c1, #e8d4a0)`
-           }}>
+      <div className="parchment-container">
         <div className="max-w-4xl w-full p-8">
           
           {step === 1 && (
-            <div className="text-center space-y-6">
-              <h1 className="text-5xl font-bold mb-8" style={{ fontFamily: '"Cinzel", serif', color: '#1a1a1a' }}>
+            <div className="text-center space-y-6 fade-in">
+              <h1 className="title-text">
                 Choose Your Campaign
               </h1>
               <div className="space-y-4">
@@ -556,12 +524,11 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
                   <button
                     key={template.id}
                     onClick={() => handleCampaignSelect(template.id)}
-                    className="w-full text-left px-8 py-6 rounded-lg transition-all hover:scale-105"
-                    style={{ background: '#ffffff', border: '3px solid #8b6f47' }}>
-                    <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: '"Cinzel", serif', color: '#1a1a1a' }}>
+                    className="campaign-card">
+                    <h2 className="campaign-title">
                       {template.name}
                     </h2>
-                    <p className="text-sm opacity-75" style={{ fontFamily: '"Cinzel", serif' }}>
+                    <p className="campaign-description">
                       {template.starter}
                     </p>
                   </button>
@@ -571,8 +538,8 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
           )}
 
           {step === 2 && (
-            <div className="text-center space-y-8">
-              <h2 className="text-4xl font-bold" style={{ fontFamily: '"Cinzel", serif', color: '#1a1a1a' }}>
+            <div className="text-center space-y-8 fade-in">
+              <h2 className="section-title">
                 How many players?
               </h2>
               <div className="flex gap-4 justify-center flex-wrap">
@@ -580,8 +547,7 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
                   <button
                     key={num}
                     onClick={() => handlePlayerCountSelect(num)}
-                    className="w-20 h-20 text-3xl font-bold rounded-lg transition-all hover:scale-110"
-                    style={{ background: '#8b6f47', color: '#f4e4c1', border: '3px solid #6b5537', fontFamily: '"Cinzel", serif' }}>
+                    className="number-button">
                     {num}
                   </button>
                 ))}
@@ -590,8 +556,8 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
           )}
 
           {step === 3 && (
-            <div>
-              <h2 className="text-3xl font-bold text-center mb-6" style={{ fontFamily: '"Cinzel", serif', color: '#1a1a1a' }}>
+            <div className="fade-in">
+              <h2 className="section-title text-center mb-6">
                 Select {numPlayers} Character{numPlayers > 1 ? 's' : ''}
                 <div className="text-lg mt-2 opacity-75">{selectedCharacters.length}/{numPlayers} selected</div>
               </h2>
@@ -603,36 +569,32 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
                     <button
                       key={character.id}
                       onClick={() => handleCharacterToggle(character)}
-                      className="p-5 rounded-lg transition-all hover:scale-105 relative"
+                      className={`character-card ${selected ? 'selected' : ''}`}
                       style={{
-                        background: selected ? '#8b6f47' : '#ffffff',
-                        border: '3px solid #8b6f47',
                         opacity: !selected && selectedCharacters.length >= numPlayers ? 0.5 : 1,
                         cursor: !selected && selectedCharacters.length >= numPlayers ? 'not-allowed' : 'pointer'
                       }}>
                       {selected && (
-                        <div className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center"
-                             style={{ background: '#f4e4c1', fontFamily: '"Cinzel", serif', fontWeight: 'bold', fontSize: '14px' }}>
+                        <div className="player-badge">
                           P{selected.playerNum}
                         </div>
                       )}
                       <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0"
-                             style={{ background: selected ? '#f4e4c1' : '#8b6f47' }}>
-                          <Icon size={32} color={selected ? '#1a1a1a' : '#f4e4c1'} />
+                        <div className="character-icon">
+                          <Icon size={32} color={selected ? '#1a1410' : '#f4e7d7'} />
                         </div>
                         <div className="flex-1 text-left">
-                          <h3 className="text-xl font-bold" style={{ fontFamily: '"Cinzel", serif', color: selected ? '#f4e4c1' : '#1a1a1a' }}>
+                          <h3 className="character-name">
                             {character.name}
                           </h3>
-                          <p className="text-sm mb-1" style={{ color: selected ? '#f4e4c1' : '#8b6f47', fontWeight: '600' }}>
+                          <p className="character-race">
                             {character.race} {character.class}
                           </p>
-                          <div className="flex gap-3 text-sm font-bold mb-1" style={{ color: selected ? '#f4e4c1' : '#1a1a1a' }}>
+                          <div className="character-stats">
                             <span>HP: {character.hp}</span>
                             <span>AC: {character.ac}</span>
                           </div>
-                          <div className="text-xs" style={{ color: selected ? '#f4e4c1' : '#666' }}>
+                          <div className="character-abilities">
                             STR {character.str >= 0 ? '+' : ''}{character.str}, DEX {character.dex >= 0 ? '+' : ''}{character.dex}, CON {character.con >= 0 ? '+' : ''}{character.con}, INT {character.int >= 0 ? '+' : ''}{character.int}, WIS {character.wis >= 0 ? '+' : ''}{character.wis}, CHA {character.cha >= 0 ? '+' : ''}{character.cha}
                           </div>
                         </div>
@@ -645,8 +607,7 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
                 <div className="text-center">
                   <button
                     onClick={startGame}
-                    className="px-12 py-4 text-2xl font-bold rounded-lg transition-all hover:scale-105"
-                    style={{ background: '#8b6f47', color: '#f4e4c1', border: '3px solid #6b5537', fontFamily: '"Cinzel", serif' }}>
+                    className="begin-button">
                     Begin Adventure
                   </button>
                 </div>
@@ -654,121 +615,119 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
             </div>
           )}
         </div>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap');`}</style>
+        <style>{parchmentStyles}</style>
       </div>
     );
   }
 
   // Game Page
   return (
-    <div className="w-full h-screen flex relative overflow-hidden"
-         style={{
-           background: 'linear-gradient(to bottom, #f4e4c1, #e8d4a0)',
-           backgroundImage: `repeating-linear-gradient(0deg, rgba(139, 101, 63, 0.03) 0px, transparent 1px, transparent 2px, rgba(139, 101, 63, 0.03) 3px), linear-gradient(to bottom, #f4e4c1, #e8d4a0)`
-         }}>
+    <div className="game-container">
       
       {/* Character Card Modal */}
       {showCharacterCard && selectedCharacterCard && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowCharacterCard(false)}>
-          <div className="bg-white rounded-lg p-8 max-w-md w-full" style={{ border: '4px solid #8b6f47' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => setShowCharacterCard(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-3xl font-bold" style={{ fontFamily: '"Cinzel", serif', color: '#1a1a1a' }}>
+              <h2 className="modal-title">
                 {selectedCharacterCard.name}
               </h2>
-              <button onClick={() => setShowCharacterCard(false)}><X size={28} /></button>
+              <button onClick={() => setShowCharacterCard(false)} className="close-button">
+                <X size={28} color="#3d2817" />
+              </button>
             </div>
             
-                          <div className="space-y-4">
-              <div className="flex items-center gap-3 pb-3 border-b-2" style={{ borderColor: '#8b6f47' }}>
-                <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: '#8b6f47' }}>
-                  {React.createElement(selectedCharacterCard.icon, { size: 32, color: '#f4e4c1' })}
+            <div className="space-y-4">
+              <div className="character-header">
+                <div className="character-icon-large">
+                  {React.createElement(selectedCharacterCard.icon, { size: 32, color: '#f4e7d7' })}
                 </div>
                 <div>
-                  <div className="text-xl font-bold" style={{ fontFamily: '"Cinzel", serif' }}>{selectedCharacterCard.name}</div>
-                  <div className="text-sm opacity-75">{selectedCharacterCard.race} {selectedCharacterCard.class}</div>
-                  <div className="text-xs opacity-60">Player {selectedCharacterCard.playerNum}</div>
+                  <div className="character-name-large">{selectedCharacterCard.name}</div>
+                  <div className="character-info">{selectedCharacterCard.race} {selectedCharacterCard.class}</div>
+                  <div className="player-number">Player {selectedCharacterCard.playerNum}</div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-lg" style={{ background: '#f4e4c1' }}>
-                  <div className="text-xs opacity-75">Health</div>
-                  <div className="text-2xl font-bold">{selectedCharacterCard.hp}</div>
+              <div className="stats-grid">
+                <div className="stat-box">
+                  <div className="stat-label">Health</div>
+                  <div className="stat-value">{selectedCharacterCard.hp}</div>
                 </div>
-                <div className="p-3 rounded-lg" style={{ background: '#f4e4c1' }}>
-                  <div className="text-xs opacity-75">Armor Class</div>
-                  <div className="text-2xl font-bold">{selectedCharacterCard.ac}</div>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t-2" style={{ borderColor: '#8b6f47' }}>
-                <h3 className="font-bold mb-3" style={{ fontFamily: '"Cinzel", serif' }}>Ability Modifiers</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="p-2 rounded text-center" style={{ background: '#f4e4c1' }}>
-                    <div className="text-xs opacity-75">STR</div>
-                    <div className="text-xl font-bold">{selectedCharacterCard.str >= 0 ? '+' : ''}{selectedCharacterCard.str}</div>
-                  </div>
-                  <div className="p-2 rounded text-center" style={{ background: '#f4e4c1' }}>
-                    <div className="text-xs opacity-75">DEX</div>
-                    <div className="text-xl font-bold">{selectedCharacterCard.dex >= 0 ? '+' : ''}{selectedCharacterCard.dex}</div>
-                  </div>
-                  <div className="p-2 rounded text-center" style={{ background: '#f4e4c1' }}>
-                    <div className="text-xs opacity-75">CON</div>
-                    <div className="text-xl font-bold">{selectedCharacterCard.con >= 0 ? '+' : ''}{selectedCharacterCard.con}</div>
-                  </div>
-                  <div className="p-2 rounded text-center" style={{ background: '#f4e4c1' }}>
-                    <div className="text-xs opacity-75">INT</div>
-                    <div className="text-xl font-bold">{selectedCharacterCard.int >= 0 ? '+' : ''}{selectedCharacterCard.int}</div>
-                  </div>
-                  <div className="p-2 rounded text-center" style={{ background: '#f4e4c1' }}>
-                    <div className="text-xs opacity-75">WIS</div>
-                    <div className="text-xl font-bold">{selectedCharacterCard.wis >= 0 ? '+' : ''}{selectedCharacterCard.wis}</div>
-                  </div>
-                  <div className="p-2 rounded text-center" style={{ background: '#f4e4c1' }}>
-                    <div className="text-xs opacity-75">CHA</div>
-                    <div className="text-xl font-bold">{selectedCharacterCard.cha >= 0 ? '+' : ''}{selectedCharacterCard.cha}</div>
-                  </div>
+                <div className="stat-box">
+                  <div className="stat-label">Armor Class</div>
+                  <div className="stat-value">{selectedCharacterCard.ac}</div>
                 </div>
               </div>
 
-              <div className="pt-3 border-t-2" style={{ borderColor: '#8b6f47' }}>
-                <h3 className="font-bold mb-3" style={{ fontFamily: '"Cinzel", serif' }}>Currency</h3>
-                <div className="flex gap-4 justify-between">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold">🪙</div>
-                    <div className="text-xs opacity-75">Gold</div>
-                    <div className="font-bold">{selectedCharacterCard.currency.gold}</div>
+              <div className="section-divider">
+                <h3 className="section-heading">Ability Modifiers</h3>
+                <div className="abilities-grid">
+                  <div className="ability-box">
+                    <div className="ability-label">STR</div>
+                    <div className="ability-value">{selectedCharacterCard.str >= 0 ? '+' : ''}{selectedCharacterCard.str}</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold">⚪</div>
-                    <div className="text-xs opacity-75">Silver</div>
-                    <div className="font-bold">{selectedCharacterCard.currency.silver}</div>
+                  <div className="ability-box">
+                    <div className="ability-label">DEX</div>
+                    <div className="ability-value">{selectedCharacterCard.dex >= 0 ? '+' : ''}{selectedCharacterCard.dex}</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold">🟤</div>
-                    <div className="text-xs opacity-75">Copper</div>
-                    <div className="font-bold">{selectedCharacterCard.currency.copper}</div>
+                  <div className="ability-box">
+                    <div className="ability-label">CON</div>
+                    <div className="ability-value">{selectedCharacterCard.con >= 0 ? '+' : ''}{selectedCharacterCard.con}</div>
+                  </div>
+                  <div className="ability-box">
+                    <div className="ability-label">INT</div>
+                    <div className="ability-value">{selectedCharacterCard.int >= 0 ? '+' : ''}{selectedCharacterCard.int}</div>
+                  </div>
+                  <div className="ability-box">
+                    <div className="ability-label">WIS</div>
+                    <div className="ability-value">{selectedCharacterCard.wis >= 0 ? '+' : ''}{selectedCharacterCard.wis}</div>
+                  </div>
+                  <div className="ability-box">
+                    <div className="ability-label">CHA</div>
+                    <div className="ability-value">{selectedCharacterCard.cha >= 0 ? '+' : ''}{selectedCharacterCard.cha}</div>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-3 border-t-2" style={{ borderColor: '#8b6f47' }}>
-                <h3 className="font-bold mb-2" style={{ fontFamily: '"Cinzel", serif' }}>Magical Items</h3>
+              <div className="section-divider">
+                <h3 className="section-heading">Currency</h3>
+                <div className="currency-display">
+                  <div className="currency-item">
+                    <div className="currency-icon">GP</div>
+                    <div className="currency-label">Gold</div>
+                    <div className="currency-amount">{selectedCharacterCard.currency.gold}</div>
+                  </div>
+                  <div className="currency-item">
+                    <div className="currency-icon">SP</div>
+                    <div className="currency-label">Silver</div>
+                    <div className="currency-amount">{selectedCharacterCard.currency.silver}</div>
+                  </div>
+                  <div className="currency-item">
+                    <div className="currency-icon">CP</div>
+                    <div className="currency-label">Copper</div>
+                    <div className="currency-amount">{selectedCharacterCard.currency.copper}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="section-divider">
+                <h3 className="section-heading">Magical Items</h3>
                 <div className="space-y-1">
                   {selectedCharacterCard.magicalItems.map((item, idx) => (
-                    <div key={idx} className="p-2 rounded text-sm" style={{ background: '#f4e4c1' }}>
-                      🧪 {item}
+                    <div key={idx} className="item-entry">
+                      {item}
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="pt-3 border-t-2" style={{ borderColor: '#8b6f47' }}>
-                <h3 className="font-bold mb-2" style={{ fontFamily: '"Cinzel", serif' }}>Backpack</h3>
+              <div className="section-divider">
+                <h3 className="section-heading">Backpack</h3>
                 <div className="space-y-1">
                   {selectedCharacterCard.backpack.map((item, idx) => (
-                    <div key={idx} className="p-2 rounded text-sm" style={{ background: '#f4e4c1' }}>
-                      🎒 {item}
+                    <div key={idx} className="item-entry">
+                      {item}
                     </div>
                   ))}
                 </div>
@@ -780,19 +739,20 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
 
       {/* Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowSettings(false)}>
-          <div className="bg-white rounded-lg p-8 max-w-lg w-full max-h-[80vh] overflow-y-auto" style={{ border: '4px solid #8b6f47' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => setShowSettings(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-3xl font-bold" style={{ fontFamily: '"Cinzel", serif', color: '#1a1a1a' }}>Settings</h2>
-              <button onClick={() => setShowSettings(false)}><X size={28} /></button>
+              <h2 className="modal-title">Settings</h2>
+              <button onClick={() => setShowSettings(false)} className="close-button">
+                <X size={28} color="#3d2817" />
+              </button>
             </div>
             
             <div className="space-y-6">
-              {/* API Info */}
-              <div className="p-4 rounded-lg" style={{ background: '#f4e4c1' }}>
-                <h3 className="font-bold text-lg mb-2" style={{ fontFamily: '"Cinzel", serif' }}>API Configuration</h3>
-                <div className="text-sm space-y-1 opacity-75">
-                  <div>✓ Claude Haiku 4: Active</div>
+              <div className="settings-info">
+                <h3 className="settings-title">API Configuration</h3>
+                <div className="settings-status">
+                  <div>Claude Haiku 4: Active</div>
                 </div>
               </div>
             </div>
@@ -801,20 +761,23 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
       )}
 
       {/* Sidebar */}
-      <div className="h-full transition-all duration-300"
-           style={{ width: showSidebar ? '280px' : '0px', background: '#ffffff', borderRight: showSidebar ? '3px solid #8b6f47' : 'none', overflow: 'hidden' }}>
+      <div className="sidebar" style={{ width: showSidebar ? '280px' : '0px' }}>
         <div className="h-full flex flex-col">
-          <div className="p-4 flex justify-end" style={{ borderBottom: '2px solid #8b6f47', background: '#f4e4c1' }}>
-            <button onClick={() => setShowSidebar(false)}><X size={24} /></button>
+          <div className="sidebar-header">
+            <button onClick={() => setShowSidebar(false)}>
+              <X size={24} color="#3d2817" />
+            </button>
           </div>
           
-          <div className="flex" style={{ borderBottom: '2px solid #8b6f47' }}>
-            <button onClick={() => setSidebarTab('campaigns')} className="flex-1 py-3"
-                    style={{ background: sidebarTab === 'campaigns' ? '#f4e4c1' : 'transparent', fontFamily: '"Cinzel", serif', fontWeight: sidebarTab === 'campaigns' ? 'bold' : 'normal', borderRight: '1px solid #8b6f47' }}>
+          <div className="sidebar-tabs">
+            <button 
+              onClick={() => setSidebarTab('campaigns')} 
+              className={`sidebar-tab ${sidebarTab === 'campaigns' ? 'active' : ''}`}>
               Campaigns
             </button>
-            <button onClick={() => setSidebarTab('party')} className="flex-1 py-3"
-                    style={{ background: sidebarTab === 'party' ? '#f4e4c1' : 'transparent', fontFamily: '"Cinzel", serif', fontWeight: sidebarTab === 'party' ? 'bold' : 'normal' }}>
+            <button 
+              onClick={() => setSidebarTab('party')} 
+              className={`sidebar-tab ${sidebarTab === 'party' ? 'active' : ''}`}>
               Party
             </button>
           </div>
@@ -823,11 +786,10 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
             {sidebarTab === 'campaigns' && (
               <div>
                 {campaigns.length > 0 ? campaigns.map(campaign => (
-                  <div key={campaign.id} className="px-4 py-3 rounded mb-2"
-                       style={{ background: campaign.active ? '#8b6f47' : '#f4e4c1', color: campaign.active ? '#f4e4c1' : '#1a1a1a', fontFamily: '"Cinzel", serif' }}>
+                  <div key={campaign.id} className={`campaign-item ${campaign.active ? 'active' : ''}`}>
                     {campaign.name} {campaign.active && '✦'}
                   </div>
-                )) : <p className="text-sm opacity-60 text-center mt-8" style={{ fontFamily: '"Cinzel", serif' }}>No campaigns yet</p>}
+                )) : <p className="empty-state">No campaigns yet</p>}
               </div>
             )}
             {sidebarTab === 'party' && (
@@ -841,18 +803,17 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
                         setSelectedCharacterCard(character);
                         setShowCharacterCard(true);
                       }}
-                      className="w-full mb-4 p-3 rounded-lg transition-all hover:scale-105"
-                      style={{ background: '#f4e4c1', border: '2px solid #8b6f47', cursor: 'pointer' }}>
+                      className="party-member-card">
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: '#8b6f47' }}>
-                          <Icon size={20} color="#f4e4c1" />
+                        <div className="party-icon">
+                          <Icon size={20} color="#f4e7d7" />
                         </div>
                         <div className="text-left">
-                          <div className="font-bold text-sm" style={{ fontFamily: '"Cinzel", serif' }}>Player {character.playerNum}</div>
-                          <div className="text-xs">{character.name}</div>
+                          <div className="party-player">Player {character.playerNum}</div>
+                          <div className="party-name">{character.name}</div>
                         </div>
                       </div>
-                      <div className="text-xs flex gap-3">
+                      <div className="party-stats">
                         <span>HP: {character.hp}</span>
                         <span>AC: {character.ac}</span>
                         <span className="font-semibold">{character.class}</span>
@@ -864,10 +825,10 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
             )}
           </div>
 
-          <div className="p-4 border-t-2" style={{ borderColor: '#8b6f47' }}>
-            <button onClick={() => { setPage('setup'); setStep(1); setShowSidebar(false); }}
-                    className="w-full px-4 py-3 rounded-lg font-bold"
-                    style={{ background: '#8b6f47', color: '#f4e4c1', border: '2px solid #6b5537', fontFamily: '"Cinzel", serif' }}>
+          <div className="sidebar-footer">
+            <button 
+              onClick={() => { setPage('setup'); setStep(1); setShowSidebar(false); }}
+              className="new-campaign-button">
               + New Campaign
             </button>
           </div>
@@ -877,38 +838,25 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {!showSidebar && (
-          <button onClick={() => setShowSidebar(true)} className="absolute top-6 left-6 z-40 p-3 rounded-lg"
-                  style={{ background: '#8b6f47', border: '2px solid #6b5537' }}>
-            <Menu size={28} color="#f4e4c1" />
+          <button onClick={() => setShowSidebar(true)} className="menu-button">
+            <Menu size={28} color="#f4e7d7" />
           </button>
         )}
         
-        <button onClick={() => setShowSettings(true)} className="absolute top-6 right-6 z-40 p-3 rounded-lg"
-                style={{ background: '#8b6f47', border: '2px solid #6b5537' }}>
-          <Settings size={28} color="#f4e4c1" />
+        <button onClick={() => setShowSettings(true)} className="settings-button">
+          <Settings size={28} color="#f4e7d7" />
         </button>
 
-        <div className="flex-1 overflow-y-auto p-16 pt-24">
+        <div className="chat-area">
           <div className="max-w-4xl mx-auto space-y-4">
             {messages.map((msg, idx) => {
               const isPlayer = msg.includes('Player') && msg.includes('said:');
-              const isRoll = msg.startsWith('🎲');
-              const isSystem = msg.startsWith('💰');
+              const isRoll = msg.includes('rolled') || msg.includes('Physical die result');
+              const isSystem = msg.includes('received:');
               
               return (
                 <div key={idx} className={`flex ${isPlayer || isRoll || isSystem ? 'justify-end' : 'justify-start'}`}>
-                  <p className="text-xl leading-relaxed max-w-2xl"
-                     style={{ 
-                       color: '#1a1a1a', 
-                       fontFamily: '"Cinzel", serif', 
-                       fontWeight: isRoll || isSystem ? '700' : (isPlayer ? '500' : '600'), 
-                       fontStyle: isPlayer ? 'italic' : 'normal', 
-                       textAlign: isPlayer || isRoll || isSystem ? 'right' : 'left',
-                       background: isRoll || isSystem ? '#f4e4c1' : 'transparent',
-                       padding: isRoll || isSystem ? '8px 12px' : '0',
-                       borderRadius: isRoll || isSystem ? '8px' : '0',
-                       border: isRoll || isSystem ? '2px solid #8b6f47' : 'none'
-                     }}>
+                  <p className={`message-text ${isPlayer ? 'player-message' : ''} ${isRoll || isSystem ? 'roll-message' : ''}`}>
                     {msg}
                   </p>
                 </div>
@@ -916,76 +864,59 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
             })}
             {streamingMessage && (
               <div className="flex justify-start">
-                <p className="text-xl leading-relaxed max-w-2xl"
-                   style={{ color: '#1a1a1a', fontFamily: '"Cinzel", serif', fontWeight: '600', textAlign: 'left' }}>
+                <p className="message-text">
                   Dungeon Master: {streamingMessage}<span className="animate-pulse">|</span>
                 </p>
               </div>
             )}
             
             {pendingRoll && !isWaitingForPhysicalRoll && (
-      <div className="flex justify-center items-center gap-4 mt-4"> {/* Container for both buttons */}
+              <div className="flex justify-center items-center gap-4 mt-4">
+                <button
+                  onClick={executeRoll}
+                  className="roll-button digital">
+                  Roll {pendingRoll.stat.toUpperCase()} Check
+                </button>
 
-        {/* Original Digital Roll Button */}
-        <button
-          onClick={executeRoll} // Calls the restored function
-          className="px-8 py-4 text-xl font-bold rounded-lg transition-all hover:scale-110"
-          style={{ background: '#8b6f47', color: '#f4e4c1', border: '3px solid #6b5537', fontFamily: '"Cinzel", serif' }}>
-          🎲 Roll {pendingRoll.stat.toUpperCase()} Check (Digital)
-        </button>
-
-        {/* Physical Roll Trigger Button */}
-        <button
-          onClick={triggerPhysicalRoll}
-          className="px-8 py-4 text-xl font-bold rounded-lg transition-all hover:scale-110 flex items-center gap-2"
-          style={{ background: '#4a90e2', color: '#ffffff', border: '3px solid #357ABD', fontFamily: '"Cinzel", serif' }}
-        >
-          <Camera size={24} />
-          Use Physical Dice
-        </button>
-
-      </div>
-    )}
+                <button
+                  onClick={triggerPhysicalRoll}
+                  className="roll-button physical">
+                  <Camera size={24} />
+                  Use Physical Dice
+                </button>
+              </div>
+            )}
 
             {isWaitingForPhysicalRoll && (
-                <div className="text-center mt-4 text-lg font-semibold italic" style={{ fontFamily: '"Cinzel", serif', color: '#6b5537' }}>
-                    Waiting for physical dice input...
-                </div>
+              <div className="waiting-message">
+                Waiting for physical dice input...
+              </div>
             )}
             
             <div ref={messagesEndRef} />
           </div>
         </div>
 
-        <div className="p-8 border-t-4" style={{ borderColor: '#8b6f47', background: 'rgba(139, 101, 63, 0.1)' }}>
+        <div className="input-area">
           <div className="max-w-4xl mx-auto">
             {selectedCharacters.length > 0 && (
-              <div className="flex gap-3 mb-4 items-center">
-                {/* Cycle Button */}
+              <div className="player-selector">
                 <button
                   onClick={cyclePlayer}
-                  className="p-3 rounded-lg transition-all hover:scale-110 flex-shrink-0"
-                  style={{ background: '#8b6f47', color: '#f4e4c1', border: '2px solid #6b5537', cursor: 'pointer' }}>
+                  className="cycle-button">
                   <RefreshCw size={24} />
                 </button>
                 
-                {/* All Players Display */}
-                <div className="flex gap-2 flex-1 justify-center flex-wrap">
+                <div className="players-display">
                   {selectedCharacters.map(character => {
                     const Icon = character.icon;
                     const isActive = character.playerNum === activePlayer;
                     return (
                       <div
                         key={character.id}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg"
-                        style={{ 
-                          background: isActive ? '#8b6f47' : '#f4e4c1', 
-                          color: isActive ? '#f4e4c1' : '#1a1a1a', 
-                          border: `2px solid ${isActive ? '#6b5537' : '#8b6f47'}`,
-                          opacity: isActive ? 1 : 0.6
-                        }}>
-                        <Icon size={20} color={isActive ? '#f4e4c1' : '#1a1a1a'} />
-                        <span className="font-bold" style={{ fontFamily: '"Cinzel", serif' }}>
+                        className={`player-chip ${isActive ? 'active' : ''}`}>
+                        <Icon size={20} color={isActive ? '#f4e7d7' : '#3d2817'} />
+                        <span>
                           {character.name} ({character.playerNum})
                         </span>
                       </div>
@@ -995,14 +926,19 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
               </div>
             )}
             <div className="flex gap-4">
-              <input type="text" value={input} onChange={(e) => setInput(e.target.value)}
-                     onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                     placeholder="What do you do?" disabled={isLoading}
-                     className="flex-1 px-6 py-4 text-xl rounded-lg"
-                     style={{ background: '#ffffff', border: '2px solid #8b6f47', color: '#1a1a1a', fontFamily: '"Cinzel", serif', outline: 'none' }} />
-              <button onClick={handleSend} disabled={!input.trim() || isLoading}
-                      className="px-8 py-4 text-xl font-semibold rounded-lg"
-                      style={{ background: isLoading || !input.trim() ? '#999' : '#8b6f47', color: '#f4e4c1', fontFamily: '"Cinzel", serif', border: '2px solid #6b5537' }}>
+              <input 
+                type="text" 
+                value={input} 
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                placeholder="What do you do?" 
+                disabled={isLoading}
+                className="message-input" />
+              <button 
+                onClick={handleSend} 
+                disabled={!input.trim() || isLoading}
+                className="send-button"
+                style={{ opacity: isLoading || !input.trim() ? 0.5 : 1 }}>
                 {isLoading ? 'Waiting...' : 'Send'}
               </button>
             </div>
@@ -1010,11 +946,841 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
         </div>
       </div>
 
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap');
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
+      <style>{parchmentStyles}</style>
     </div>
   );
 }
 
+const parchmentStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=IM+Fell+English:ital@0;1&display=swap');
+
+  .parchment-container {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #e8d5c4;
+    background-image: 
+      radial-circle at 20% 30%, rgba(107, 30, 30, 0.05) 0%, transparent 40%),
+      radial-circle at 80% 70%, rgba(61, 40, 23, 0.08) 0%, transparent 35%),
+      repeating-linear-gradient(
+        90deg,
+        transparent 0px,
+        transparent 2px,
+        rgba(61, 40, 23, 0.02) 2px,
+        rgba(61, 40, 23, 0.02) 3px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        transparent 0px,
+        transparent 2px,
+        rgba(61, 40, 23, 0.02) 2px,
+        rgba(61, 40, 23, 0.02) 3px
+      );
+    position: relative;
+  }
+
+  .parchment-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: 
+      radial-circle at 15% 25%, rgba(92, 64, 51, 0.1) 0%, transparent 15%),
+      radial-circle at 85% 15%, rgba(92, 64, 51, 0.08) 0%, transparent 12%),
+      radial-circle at 50% 80%, rgba(92, 64, 51, 0.06) 0%, transparent 20%);
+    pointer-events: none;
+  }
+
+  .game-container {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+    background-color: #e8d5c4;
+    background-image: 
+      radial-circle at 20% 30%, rgba(107, 30, 30, 0.05) 0%, transparent 40%),
+      radial-circle at 80% 70%, rgba(61, 40, 23, 0.08) 0%, transparent 35%),
+      repeating-linear-gradient(
+        90deg,
+        transparent 0px,
+        transparent 2px,
+        rgba(61, 40, 23, 0.02) 2px,
+        rgba(61, 40, 23, 0.02) 3px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        transparent 0px,
+        transparent 2px,
+        rgba(61, 40, 23, 0.02) 2px,
+        rgba(61, 40, 23, 0.02) 3px
+      );
+  }
+
+  .title-text {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
+    font-family: 'Cinzel', serif;
+    color: #1a1410;
+    text-shadow: 2px 2px 0px rgba(92, 64, 51, 0.2);
+    letter-spacing: 0.05em;
+  }
+
+  .section-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    font-family: 'Cinzel', serif;
+    color: #1a1410;
+    letter-spacing: 0.03em;
+  }
+
+  .campaign-card {
+    width: 100%;
+    text-align: left;
+    padding: 2rem;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    background: #f4e7d7;
+    border: 3px solid #5c4033;
+    border-style: solid;
+    box-shadow: 
+      3px 3px 0px rgba(61, 40, 23, 0.3),
+      inset 0 0 20px rgba(244, 231, 215, 0.5);
+    cursor: pointer;
+  }
+
+  .campaign-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 
+      5px 5px 0px rgba(61, 40, 23, 0.4),
+      inset 0 0 25px rgba(244, 231, 215, 0.6);
+  }
+
+  .campaign-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    font-family: 'Cinzel', serif;
+    color: #1a1410;
+    letter-spacing: 0.02em;
+  }
+
+  .campaign-description {
+    font-size: 0.875rem;
+    opacity: 0.75;
+    font-family: 'Crimson Text', serif;
+    line-height: 1.6;
+    color: #3d2817;
+  }
+
+  .number-button {
+    width: 5rem;
+    height: 5rem;
+    font-size: 1.875rem;
+    font-weight: 700;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    background: #5c4033;
+    color: #f4e7d7;
+    border: 3px solid #3d2817;
+    font-family: 'Cinzel', serif;
+    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.4);
+    cursor: pointer;
+  }
+
+  .number-button:hover {
+    transform: scale(1.15) rotate(5deg);
+    box-shadow: 5px 5px 0px rgba(26, 20, 16, 0.5);
+  }
+
+  .character-card {
+    padding: 1.25rem;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    background: #f4e7d7;
+    border: 3px solid #5c4033;
+    position: relative;
+    box-shadow: 2px 2px 0px rgba(61, 40, 23, 0.3);
+    cursor: pointer;
+  }
+
+  .character-card:hover {
+    transform: translateY(-3px) scale(1.03);
+    box-shadow: 4px 4px 0px rgba(61, 40, 23, 0.4);
+  }
+
+  .character-card.selected {
+    background: #5c4033;
+    border-color: #3d2817;
+  }
+
+  .player-badge {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f4e7d7;
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: #3d2817;
+    border: 2px solid #3d2817;
+  }
+
+  .character-icon {
+    width: 4rem;
+    height: 4rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: #5c4033;
+    border: 2px solid #3d2817;
+  }
+
+  .character-card.selected .character-icon {
+    background: #f4e7d7;
+    border-color: #3d2817;
+  }
+
+  .character-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-family: 'Cinzel', serif;
+    color: #1a1410;
+  }
+
+  .character-card.selected .character-name {
+    color: #f4e7d7;
+  }
+
+  .character-race {
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+    color: #5c4033;
+  }
+
+  .character-card.selected .character-race {
+    color: #f4e7d7;
+  }
+
+  .character-stats {
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+    color: #1a1410;
+  }
+
+  .character-card.selected .character-stats {
+    color: #f4e7d7;
+  }
+
+  .character-abilities {
+    font-size: 0.75rem;
+    color: #666;
+  }
+
+  .character-card.selected .character-abilities {
+    color: #e8d5c4;
+  }
+
+  .begin-button {
+    padding: 1rem 3rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    background: #5c4033;
+    color: #f4e7d7;
+    border: 3px solid #3d2817;
+    font-family: 'Cinzel', serif;
+    box-shadow: 4px 4px 0px rgba(26, 20, 16, 0.4);
+    cursor: pointer;
+  }
+
+  .begin-button:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 6px 6px 0px rgba(26, 20, 16, 0.5);
+  }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(26, 20, 16, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+
+  .modal-card {
+    background: #f4e7d7;
+    border-radius: 4px;
+    padding: 2rem;
+    max-width: 28rem;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 4px solid #5c4033;
+    box-shadow: 0 10px 30px rgba(26, 20, 16, 0.5);
+  }
+
+  .modal-title {
+    font-size: 1.875rem;
+    font-weight: 700;
+    font-family: 'Cinzel', serif;
+    color: #1a1410;
+    letter-spacing: 0.02em;
+  }
+
+  .close-button {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+
+  .close-button:hover {
+    transform: scale(1.1) rotate(90deg);
+  }
+
+  .character-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #5c4033;
+  }
+
+  .character-icon-large {
+    width: 4rem;
+    height: 4rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #5c4033;
+    border: 2px solid #3d2817;
+  }
+
+  .character-name-large {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-family: 'Cinzel', serif;
+    color: #1a1410;
+  }
+
+  .character-info {
+    font-size: 0.875rem;
+    opacity: 0.75;
+    color: #3d2817;
+    font-family: 'Crimson Text', serif;
+  }
+
+  .player-number {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    color: #3d2817;
+    font-family: 'Crimson Text', serif;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .stat-box {
+    padding: 0.75rem;
+    border-radius: 4px;
+    background: #e8d5c4;
+    border: 2px solid #5c4033;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    opacity: 0.75;
+    font-family: 'Crimson Text', serif;
+    color: #3d2817;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: 'Cinzel', serif;
+    color: #1a1410;
+  }
+
+  .section-divider {
+    padding-top: 0.75rem;
+    border-top: 2px solid #5c4033;
+  }
+
+  .section-heading {
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    font-family: 'Cinzel', serif;
+    color: #1a1410;
+    font-size: 1.1rem;
+    letter-spacing: 0.02em;
+  }
+
+  .abilities-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+
+  .ability-box {
+    padding: 0.5rem;
+    border-radius: 4px;
+    text-align: center;
+    background: #e8d5c4;
+    border: 2px solid #5c4033;
+  }
+
+  .ability-label {
+    font-size: 0.75rem;
+    opacity: 0.75;
+    font-family: 'Crimson Text', serif;
+    color: #3d2817;
+  }
+
+  .ability-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-family: 'Cinzel', serif;
+    color: #1a1410;
+  }
+
+  .currency-display {
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+  }
+
+  .currency-item {
+    text-align: center;
+  }
+
+  .currency-icon {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: 'Cinzel', serif;
+    color: #5c4033;
+  }
+
+  .currency-label {
+    font-size: 0.75rem;
+    opacity: 0.75;
+    font-family: 'Crimson Text', serif;
+    color: #3d2817;
+  }
+
+  .currency-amount {
+    font-weight: 700;
+    font-family: 'Cinzel', serif;
+    color: #1a1410;
+  }
+
+  .item-entry {
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    background: #e8d5c4;
+    border: 1px solid #5c4033;
+    font-family: 'Crimson Text', serif;
+    color: #3d2817;
+  }
+
+  .settings-info {
+    padding: 1rem;
+    border-radius: 4px;
+    background: #e8d5c4;
+    border: 2px solid #5c4033;
+  }
+
+  .settings-title {
+    font-weight: 700;
+    font-size: 1.125rem;
+    margin-bottom: 0.5rem;
+    font-family: 'Cinzel', serif;
+    color: #1a1410;
+  }
+
+  .settings-status {
+    font-size: 0.875rem;
+    opacity: 0.75;
+    font-family: 'Crimson Text', serif;
+    color: #3d2817;
+  }
+
+  .sidebar {
+    height: 100%;
+    transition: width 0.3s ease;
+    background: #f4e7d7;
+    border-right: 3px solid #5c4033;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 1rem;
+    display: flex;
+    justify-content: flex-end;
+    border-bottom: 2px solid #5c4033;
+    background: #e8d5c4;
+  }
+
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 2px solid #5c4033;
+  }
+
+  .sidebar-tab {
+    flex: 1;
+    padding: 0.75rem;
+    background: transparent;
+    font-family: 'Cinzel', serif;
+    color: #3d2817;
+    border-right: 1px solid #5c4033;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .sidebar-tab:last-child {
+    border-right: none;
+  }
+
+  .sidebar-tab.active {
+    background: #e8d5c4;
+    font-weight: 700;
+  }
+
+  .campaign-item {
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    background: #e8d5c4;
+    color: #1a1410;
+    font-family: 'Crimson Text', serif;
+    border: 2px solid #5c4033;
+  }
+
+  .campaign-item.active {
+    background: #5c4033;
+    color: #f4e7d7;
+    font-weight: 600;
+  }
+
+  .empty-state {
+    font-size: 0.875rem;
+    opacity: 0.6;
+    text-align: center;
+    margin-top: 2rem;
+    font-family: 'Crimson Text', serif;
+    color: #3d2817;
+  }
+
+  .party-member-card {
+    width: 100%;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    background: #e8d5c4;
+    border: 2px solid #5c4033;
+    cursor: pointer;
+  }
+
+  .party-member-card:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 3px 3px 0px rgba(61, 40, 23, 0.3);
+  }
+
+  .party-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #5c4033;
+    border: 2px solid #3d2817;
+  }
+
+  .party-player {
+    font-weight: 700;
+    font-size: 0.875rem;
+    font-family: 'Cinzel', serif;
+    color: #1a1410;
+  }
+
+  .party-name {
+    font-size: 0.75rem;
+    font-family: 'Crimson Text', serif;
+    color: #3d2817;
+  }
+
+  .party-stats {
+    font-size: 0.75rem;
+    display: flex;
+    gap: 0.75rem;
+    font-family: 'Crimson Text', serif;
+    color: #3d2817;
+  }
+
+  .sidebar-footer {
+    padding: 1rem;
+    border-top: 2px solid #5c4033;
+  }
+
+  .new-campaign-button {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    font-weight: 700;
+    background: #5c4033;
+    color: #f4e7d7;
+    border: 2px solid #3d2817;
+    font-family: 'Cinzel', serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .new-campaign-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.4);
+  }
+
+  .menu-button {
+    position: absolute;
+    top: 1.5rem;
+    left: 1.5rem;
+    z-index: 40;
+    padding: 0.75rem;
+    border-radius: 4px;
+    background: #5c4033;
+    border: 2px solid #3d2817;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 2px 2px 0px rgba(26, 20, 16, 0.3);
+  }
+
+  .menu-button:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.4);
+  }
+
+  .settings-button {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    z-index: 40;
+    padding: 0.75rem;
+    border-radius: 4px;
+    background: #5c4033;
+    border: 2px solid #3d2817;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 2px 2px 0px rgba(26, 20, 16, 0.3);
+  }
+
+  .settings-button:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.4);
+  }
+
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4rem;
+    padding-top: 6rem;
+  }
+
+  .message-text {
+    font-size: 1.25rem;
+    line-height: 1.8;
+    max-width: 42rem;
+    color: #1a1410;
+    font-family: 'Crimson Text', serif;
+    font-weight: 600;
+  }
+
+  .player-message {
+    font-weight: 500;
+    font-style: italic;
+  }
+
+  .roll-message {
+    font-weight: 700;
+    background: #e8d5c4;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    border: 2px solid #5c4033;
+  }
+
+  .roll-button {
+    padding: 1rem 2rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    font-family: 'Cinzel', serif;
+    cursor: pointer;
+    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .roll-button:hover {
+    transform: translateY(-3px) scale(1.08);
+    box-shadow: 5px 5px 0px rgba(26, 20, 16, 0.4);
+  }
+
+  .roll-button.digital {
+    background: #5c4033;
+    color: #f4e7d7;
+    border: 3px solid #3d2817;
+  }
+
+  .roll-button.physical {
+    background: #6b1e1e;
+    color: #f4e7d7;
+    border: 3px solid #4a1414;
+  }
+
+  .waiting-message {
+    text-align: center;
+    margin-top: 1rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    font-style: italic;
+    font-family: 'Crimson Text', serif;
+    color: #5c4033;
+  }
+
+  .input-area {
+    padding: 2rem;
+    border-top: 4px solid #5c4033;
+    background: rgba(232, 213, 196, 0.7);
+  }
+
+  .player-selector {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    align-items: center;
+  }
+
+  .cycle-button {
+    padding: 0.75rem;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    background: #5c4033;
+    color: #f4e7d7;
+    border: 2px solid #3d2817;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .cycle-button:hover {
+    transform: scale(1.1) rotate(90deg);
+  }
+
+  .players-display {
+    display: flex;
+    gap: 0.5rem;
+    flex: 1;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .player-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    border: 2px solid #5c4033;
+    background: #e8d5c4;
+    color: #1a1410;
+    opacity: 0.6;
+    transition: all 0.2s ease;
+  }
+
+  .player-chip.active {
+    background: #5c4033;
+    color: #f4e7d7;
+    border-color: #3d2817;
+    opacity: 1;
+  }
+
+  .player-chip span {
+    font-weight: 700;
+    font-family: 'Cinzel', serif;
+  }
+
+  .message-input {
+    flex: 1;
+    padding: 1rem 1.5rem;
+    font-size: 1.25rem;
+    border-radius: 4px;
+    background: #f4e7d7;
+    border: 2px solid #5c4033;
+    color: #1a1410;
+    font-family: 'Crimson Text', serif;
+    outline: none;
+  }
+
+  .message-input:focus {
+    border-color: #3d2817;
+    box-shadow: 0 0 0 3px rgba(92, 64, 51, 0.2);
+  }
+
+  .send-button {
+    padding: 1rem 2rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    border-radius: 4px;
+    background: #5c4033;
+    color: #f4e7d7;
+    font-family: 'Cinzel', serif;
+    border: 2px solid #3d2817;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .send-button:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.4);
+  }
+
+  .send-button:disabled {
+    cursor: not-allowed;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.6s ease-out;
+  }
+`;
