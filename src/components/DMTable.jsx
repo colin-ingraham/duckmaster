@@ -18,7 +18,29 @@ export default function DMTable() {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState('');
   const [suggestions, setSuggestions] = useState([]);
-  
+  const triggerCoinDispenser = async (amount) => {
+    // Only dispense positive amounts of gold (1 gold = 1 coin)
+    if (amount <= 0) return; 
+
+    console.log(`💰 Requesting physical dispense of ${amount} gold coins...`);
+    try {
+      const response = await fetch("http://localhost:3001/api/dispense-coins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amount }),
+      });
+
+      if (response.ok) {
+        console.log("💰 Dispense request sent successfully.");
+      } else {
+        console.error("💰 Dispense request failed.");
+      }
+    } catch (error) {
+      console.error("Error calling coin dispenser:", error);
+      // Optional: Add a system message to the user if it fails
+      // setMessages(prev => [...prev, "System: Coin dispenser failed to respond."]);
+    }
+  };
   const updateCharacterCurrency = (playerNum, gold = 0, silver = 0, copper = 0) => {
     setSelectedCharacters(prev => prev.map(char => {
       if (char.playerNum === playerNum) {
@@ -138,7 +160,24 @@ CURRENT PLAYER: ${currentPlayer ? currentPlayer.name : `Player ${activePlayer}`}
 
 CONTEXT:
 ${messages.slice(-3).join('\n')}
+DICE ROLLING SYSTEM (CRITICAL - READ CAREFULLY):
+Almost EVERY action with uncertainty requires a dice roll. You MUST ask for rolls frequently.
 
+WHEN TO CALL FOR ROLLS (roll for ANY of these):
+✅ Combat: Attack, dodge, defend, grapple
+✅ Physical: Climb, jump, swim, lift, break down doors, run
+✅ Stealth: Hide, sneak, pickpocket, move silently
+✅ Social: Persuade, intimidate, deceive, perform, insight
+✅ Investigation: Search rooms, find clues, track, perception
+✅ Knowledge: Recall lore, identify items, understand languages
+✅ Magic: Cast spells, sense magic, arcane knowledge
+✅ Survival: Navigate, forage, track creatures, animal handling
+✅ Skills: Lockpicking, disarm traps, medicine, crafting
+WHEN NOT TO ROLL:
+- Simple conversation with no deception
+- Walking through open areas with no danger
+- Automatic actions (opening unlocked doors, picking up items)
+- Actions that would definitely succeed or fail based on game logic
 ROLLING SYSTEM:
 When action needs a roll, ask: "Roll a [stat] check (DC [number])."
 - DC 5: Trivial
@@ -290,6 +329,7 @@ DM Response (plain text, under 500 chars):`
         
         if (receivedItems.length > 0) {
           updateCharacterCurrency(activePlayer, goldChange, silverChange, copperChange);
+          triggerCoinDispenser(goldChange);
           const systemMessage = `${currentPlayer.name} received: ${receivedItems.join(', ')}`;
           setMessages(prev => [...prev, `Dungeon Master: ${fullText}`, systemMessage]);
           setStreamingMessage('');
