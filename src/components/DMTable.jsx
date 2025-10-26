@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, X, Settings, Sword, Wand2, Shield, Crosshair, Book, Heart, RefreshCw, Camera } from 'lucide-react';
+import { Menu, X, Settings, Sword, Wand2, Shield, Crosshair, Book, Heart, Camera } from 'lucide-react';
 
 export default function DMTable() {
   // Core state
@@ -624,18 +624,84 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
   return (
     <div className="game-container">
       
+      {/* Left Campaign Sidebar */}
+      <div className="campaign-sidebar">
+        <div className="campaign-sidebar-content">
+          {/* Logo */}
+          <div className="logo-container">
+            <img src="/static/logo.png" alt="Campaign Logo" className="campaign-logo" />
+          </div>
+
+          {/* Campaign Info */}
+          <div className="campaign-info-section">
+            <h3 className="campaign-info-title">Campaign</h3>
+            <p className="campaign-info-text">{selectedCampaign?.name || "Active Campaign"}</p>
+          </div>
+
+          {/* Party Members */}
+          <div className="campaign-info-section">
+            <h3 className="campaign-info-title">Party Members</h3>
+            <div className="party-members-list">
+              {selectedCharacters.map(character => {
+                const Icon = character.icon;
+                return (
+                  <button
+                    key={character.id}
+                    onClick={() => {
+                      setSelectedCharacterCard(character);
+                      setShowCharacterCard(true);
+                    }}
+                    className="party-member-item">
+                    <div className="party-member-icon-small">
+                      <Icon size={16} color="#f4e7d7" />
+                    </div>
+                    <div className="party-member-info">
+                      <div className="party-member-name-small">{character.name}</div>
+                      <div className="party-member-class-small">{character.class}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="campaign-info-section">
+            <h3 className="campaign-info-title">Active Player</h3>
+            {selectedCharacters.find(c => c.playerNum === activePlayer) && (
+              <div className="active-player-display">
+                <div className="active-player-name">
+                  {selectedCharacters.find(c => c.playerNum === activePlayer).name}
+                </div>
+                <div className="active-player-hp">
+                  HP: {selectedCharacters.find(c => c.playerNum === activePlayer).hp} | 
+                  AC: {selectedCharacters.find(c => c.playerNum === activePlayer).ac}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Settings Button */}
+          <button 
+            onClick={() => setShowSettings(true)} 
+            className="sidebar-settings-button">
+            <Settings size={20} color="#f4e7d7" />
+            <span>Settings</span>
+          </button>
+        </div>
+      </div>
+      
       {/* Character Card Modal */}
       {showCharacterCard && selectedCharacterCard && (
         <div className="modal-overlay" onClick={() => setShowCharacterCard(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="modal-title">
-                {selectedCharacterCard.name}
-              </h2>
-              <button onClick={() => setShowCharacterCard(false)} className="close-button">
-                <X size={28} color="#3d2817" />
-              </button>
-            </div>
+            <button onClick={() => setShowCharacterCard(false)} className="modal-close-button">
+              <X size={28} color="#3d2817" />
+            </button>
+            
+            <h2 className="modal-title">
+              {selectedCharacterCard.name}
+            </h2>
             
             <div className="space-y-4">
               <div className="character-header">
@@ -741,12 +807,11 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
       {showSettings && (
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="modal-title">Settings</h2>
-              <button onClick={() => setShowSettings(false)} className="close-button">
-                <X size={28} color="#3d2817" />
-              </button>
-            </div>
+            <button onClick={() => setShowSettings(false)} className="modal-close-button">
+              <X size={28} color="#3d2817" />
+            </button>
+            
+            <h2 className="modal-title">Settings</h2>
             
             <div className="space-y-6">
               <div className="settings-info">
@@ -760,102 +825,17 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
         </div>
       )}
 
-      {/* Sidebar */}
-      <div className="sidebar" style={{ width: showSidebar ? '280px' : '0px' }}>
-        <div className="h-full flex flex-col">
-          <div className="sidebar-header">
-            <button onClick={() => setShowSidebar(false)}>
-              <X size={24} color="#3d2817" />
-            </button>
-          </div>
-          
-          <div className="sidebar-tabs">
-            <button 
-              onClick={() => setSidebarTab('campaigns')} 
-              className={`sidebar-tab ${sidebarTab === 'campaigns' ? 'active' : ''}`}>
-              Campaigns
-            </button>
-            <button 
-              onClick={() => setSidebarTab('party')} 
-              className={`sidebar-tab ${sidebarTab === 'party' ? 'active' : ''}`}>
-              Party
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4">
-            {sidebarTab === 'campaigns' && (
-              <div>
-                {campaigns.length > 0 ? campaigns.map(campaign => (
-                  <div key={campaign.id} className={`campaign-item ${campaign.active ? 'active' : ''}`}>
-                    {campaign.name} {campaign.active && '✦'}
-                  </div>
-                )) : <p className="empty-state">No campaigns yet</p>}
-              </div>
-            )}
-            {sidebarTab === 'party' && (
-              <div>
-                {selectedCharacters.map(character => {
-                  const Icon = character.icon;
-                  return (
-                    <button
-                      key={character.id}
-                      onClick={() => {
-                        setSelectedCharacterCard(character);
-                        setShowCharacterCard(true);
-                      }}
-                      className="party-member-card">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="party-icon">
-                          <Icon size={20} color="#f4e7d7" />
-                        </div>
-                        <div className="text-left">
-                          <div className="party-player">Player {character.playerNum}</div>
-                          <div className="party-name">{character.name}</div>
-                        </div>
-                      </div>
-                      <div className="party-stats">
-                        <span>HP: {character.hp}</span>
-                        <span>AC: {character.ac}</span>
-                        <span className="font-semibold">{character.class}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="sidebar-footer">
-            <button 
-              onClick={() => { setPage('setup'); setStep(1); setShowSidebar(false); }}
-              className="new-campaign-button">
-              + New Campaign
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {!showSidebar && (
-          <button onClick={() => setShowSidebar(true)} className="menu-button">
-            <Menu size={28} color="#f4e7d7" />
-          </button>
-        )}
-        
-        <button onClick={() => setShowSettings(true)} className="settings-button">
-          <Settings size={28} color="#f4e7d7" />
-        </button>
-
+      <div className="main-content">
         <div className="chat-area">
-          <div className="max-w-4xl mx-auto space-y-4">
+          <div className="chat-messages-container">
             {messages.map((msg, idx) => {
               const isPlayer = msg.includes('Player') && msg.includes('said:');
               const isRoll = msg.includes('rolled') || msg.includes('Physical die result');
               const isSystem = msg.includes('received:');
               
               return (
-                <div key={idx} className={`flex ${isPlayer || isRoll || isSystem ? 'justify-end' : 'justify-start'}`}>
+                <div key={idx} className={`message-wrapper ${isPlayer || isRoll || isSystem ? 'message-right' : 'message-left'}`}>
                   <p className={`message-text ${isPlayer ? 'player-message' : ''} ${isRoll || isSystem ? 'roll-message' : ''}`}>
                     {msg}
                   </p>
@@ -863,7 +843,7 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
               );
             })}
             {streamingMessage && (
-              <div className="flex justify-start">
+              <div className="message-wrapper message-left">
                 <p className="message-text">
                   Dungeon Master: {streamingMessage}<span className="animate-pulse">|</span>
                 </p>
@@ -871,7 +851,7 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
             )}
             
             {pendingRoll && !isWaitingForPhysicalRoll && (
-              <div className="flex justify-center items-center gap-4 mt-4">
+              <div className="roll-buttons-container">
                 <button
                   onClick={executeRoll}
                   className="roll-button digital">
@@ -898,34 +878,29 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
         </div>
 
         <div className="input-area">
-          <div className="max-w-4xl mx-auto">
+          <div className="input-container">
             {selectedCharacters.length > 0 && (
               <div className="player-selector">
-                <button
-                  onClick={cyclePlayer}
-                  className="cycle-button">
-                  <RefreshCw size={24} />
-                </button>
-                
                 <div className="players-display">
                   {selectedCharacters.map(character => {
                     const Icon = character.icon;
                     const isActive = character.playerNum === activePlayer;
                     return (
-                      <div
+                      <button
                         key={character.id}
+                        onClick={() => setActivePlayer(character.playerNum)}
                         className={`player-chip ${isActive ? 'active' : ''}`}>
                         <Icon size={20} color={isActive ? '#f4e7d7' : '#3d2817'} />
                         <span>
                           {character.name} ({character.playerNum})
                         </span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
               </div>
             )}
-            <div className="flex gap-4">
+            <div className="input-row">
               <input 
                 type="text" 
                 value={input} 
@@ -953,6 +928,12 @@ ${player ? player.name : `Player ${activePlayer}`}'s result:`
 
 const parchmentStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=IM+Fell+English:ital@0;1&display=swap');
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
   .parchment-container {
     width: 100%;
@@ -1018,6 +999,381 @@ const parchmentStyles = `
       );
   }
 
+  /* Campaign Sidebar */
+  .campaign-sidebar {
+    width: 280px;
+    height: 100vh;
+    background: #3d2817;
+    border-right: 4px solid #1a1410;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    box-shadow: 4px 0 12px rgba(26, 20, 16, 0.4);
+  }
+
+  .campaign-sidebar-content {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .logo-container {
+    text-align: center;
+    padding: 1rem 0;
+    border-bottom: 2px solid #5c4033;
+  }
+
+  .campaign-logo {
+    max-width: 180px;
+    height: auto;
+    border-radius: 8px;
+    border: 3px solid #5c4033;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .campaign-info-section {
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #5c4033;
+  }
+
+  .campaign-info-title {
+    font-family: 'Cinzel', serif;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #e8d5c4;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.75rem;
+  }
+
+  .campaign-info-text {
+    font-family: 'Crimson Text', serif;
+    font-size: 1rem;
+    color: #f4e7d7;
+    line-height: 1.5;
+  }
+
+  .party-members-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .party-member-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: rgba(244, 231, 215, 0.1);
+    border: 2px solid #5c4033;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .party-member-item:hover {
+    background: rgba(244, 231, 215, 0.2);
+    transform: translateX(4px);
+  }
+
+  .party-member-icon-small {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: #5c4033;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .party-member-info {
+    flex: 1;
+    text-align: left;
+  }
+
+  .party-member-name-small {
+    font-family: 'Cinzel', serif;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #f4e7d7;
+  }
+
+  .party-member-class-small {
+    font-family: 'Crimson Text', serif;
+    font-size: 0.75rem;
+    color: #e8d5c4;
+    opacity: 0.8;
+  }
+
+  .active-player-display {
+    padding: 0.75rem;
+    background: rgba(107, 30, 30, 0.3);
+    border: 2px solid #6b1e1e;
+    border-radius: 4px;
+  }
+
+  .active-player-name {
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #f4e7d7;
+    margin-bottom: 0.25rem;
+  }
+
+  .active-player-hp {
+    font-family: 'Crimson Text', serif;
+    font-size: 0.875rem;
+    color: #e8d5c4;
+  }
+
+  .sidebar-settings-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: #5c4033;
+    border: 2px solid #3d2817;
+    border-radius: 4px;
+    color: #f4e7d7;
+    font-family: 'Cinzel', serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: auto;
+  }
+
+  .sidebar-settings-button:hover {
+    background: #6b5537;
+    transform: translateY(-2px);
+  }
+
+  /* Main Content Area */
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
+    display: flex;
+    justify-content: center;
+  }
+
+  .chat-messages-container {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .message-wrapper {
+    display: flex;
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  .message-wrapper.message-left {
+    justify-content: flex-start;
+  }
+
+  .message-wrapper.message-right {
+    justify-content: flex-end;
+  }
+
+  .message-text {
+    font-size: 1.125rem;
+    line-height: 1.7;
+    max-width: 700px;
+    color: #1a1410;
+    font-family: 'Crimson Text', serif;
+    font-weight: 600;
+    padding: 1rem 1.25rem;
+    background: rgba(244, 231, 215, 0.6);
+    border-radius: 6px;
+    border: 2px solid rgba(92, 64, 51, 0.3);
+  }
+
+  .player-message {
+    font-weight: 500;
+    font-style: italic;
+    background: rgba(232, 213, 196, 0.5);
+  }
+
+  .roll-message {
+    font-weight: 700;
+    background: #e8d5c4;
+    border: 2px solid #5c4033;
+    box-shadow: 2px 2px 0px rgba(61, 40, 23, 0.2);
+  }
+
+  .roll-buttons-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+
+  .roll-button {
+    padding: 1rem 2rem;
+    font-size: 1.125rem;
+    font-weight: 700;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    font-family: 'Cinzel', serif;
+    cursor: pointer;
+    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .roll-button:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 5px 5px 0px rgba(26, 20, 16, 0.4);
+  }
+
+  .roll-button.digital {
+    background: #5c4033;
+    color: #f4e7d7;
+    border: 3px solid #3d2817;
+  }
+
+  .roll-button.physical {
+    background: #6b1e1e;
+    color: #f4e7d7;
+    border: 3px solid #4a1414;
+  }
+
+  .waiting-message {
+    text-align: center;
+    margin: 1rem 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    font-style: italic;
+    font-family: 'Crimson Text', serif;
+    color: #5c4033;
+  }
+
+  /* Input Area */
+  .input-area {
+    padding: 1.5rem 2rem;
+    border-top: 4px solid #5c4033;
+    background: rgba(232, 213, 196, 0.8);
+    display: flex;
+    justify-content: center;
+  }
+
+  .input-container {
+    width: 100%;
+    max-width: 900px;
+  }
+
+  .player-selector {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .players-display {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .player-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: 2px solid #5c4033;
+    background: #e8d5c4;
+    color: #1a1410;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .player-chip:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+    box-shadow: 2px 2px 0px rgba(61, 40, 23, 0.3);
+  }
+
+  .player-chip.active {
+    background: #5c4033;
+    color: #f4e7d7;
+    border-color: #3d2817;
+    opacity: 1;
+    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.4);
+  }
+
+  .player-chip span {
+    font-weight: 700;
+    font-family: 'Cinzel', serif;
+    font-size: 0.875rem;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .message-input {
+    flex: 1;
+    padding: 1rem 1.5rem;
+    font-size: 1.125rem;
+    border-radius: 6px;
+    background: #f4e7d7;
+    border: 2px solid #5c4033;
+    color: #1a1410;
+    font-family: 'Crimson Text', serif;
+    outline: none;
+    transition: all 0.2s ease;
+  }
+
+  .message-input:focus {
+    border-color: #3d2817;
+    box-shadow: 0 0 0 3px rgba(92, 64, 51, 0.2);
+  }
+
+  .message-input::placeholder {
+    color: rgba(61, 40, 23, 0.5);
+  }
+
+  .send-button {
+    padding: 1rem 2rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    border-radius: 6px;
+    background: #5c4033;
+    color: #f4e7d7;
+    font-family: 'Cinzel', serif;
+    border: 2px solid #3d2817;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .send-button:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.4);
+  }
+
+  .send-button:disabled {
+    cursor: not-allowed;
+  }
+
   .title-text {
     font-size: 3rem;
     font-weight: 700;
@@ -1026,6 +1382,7 @@ const parchmentStyles = `
     color: #1a1410;
     text-shadow: 2px 2px 0px rgba(92, 64, 51, 0.2);
     letter-spacing: 0.05em;
+    text-align: center;
   }
 
   .section-title {
@@ -1034,6 +1391,7 @@ const parchmentStyles = `
     font-family: 'Cinzel', serif;
     color: #1a1410;
     letter-spacing: 0.03em;
+    text-align: center;
   }
 
   .campaign-card {
@@ -1234,6 +1592,26 @@ const parchmentStyles = `
     overflow-y: auto;
     border: 4px solid #5c4033;
     box-shadow: 0 10px 30px rgba(26, 20, 16, 0.5);
+    position: relative;
+  }
+
+  .modal-close-button {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    background: transparent;
+    border: none;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+
+  .modal-close-button:hover {
+    transform: scale(1.1) rotate(90deg);
   }
 
   .modal-title {
@@ -1242,6 +1620,8 @@ const parchmentStyles = `
     font-family: 'Cinzel', serif;
     color: #1a1410;
     letter-spacing: 0.02em;
+    margin-bottom: 1.5rem;
+    padding-right: 2rem;
   }
 
   .close-button {
@@ -1422,351 +1802,6 @@ const parchmentStyles = `
     opacity: 0.75;
     font-family: 'Crimson Text', serif;
     color: #3d2817;
-  }
-
-  .sidebar {
-    height: 100%;
-    transition: width 0.3s ease;
-    background: #f4e7d7;
-    border-right: 3px solid #5c4033;
-    overflow: hidden;
-  }
-
-  .sidebar-header {
-    padding: 1rem;
-    display: flex;
-    justify-content: flex-end;
-    border-bottom: 2px solid #5c4033;
-    background: #e8d5c4;
-  }
-
-  .sidebar-tabs {
-    display: flex;
-    border-bottom: 2px solid #5c4033;
-  }
-
-  .sidebar-tab {
-    flex: 1;
-    padding: 0.75rem;
-    background: transparent;
-    font-family: 'Cinzel', serif;
-    color: #3d2817;
-    border-right: 1px solid #5c4033;
-    transition: all 0.2s ease;
-    cursor: pointer;
-  }
-
-  .sidebar-tab:last-child {
-    border-right: none;
-  }
-
-  .sidebar-tab.active {
-    background: #e8d5c4;
-    font-weight: 700;
-  }
-
-  .campaign-item {
-    padding: 0.75rem 1rem;
-    border-radius: 4px;
-    margin-bottom: 0.5rem;
-    background: #e8d5c4;
-    color: #1a1410;
-    font-family: 'Crimson Text', serif;
-    border: 2px solid #5c4033;
-  }
-
-  .campaign-item.active {
-    background: #5c4033;
-    color: #f4e7d7;
-    font-weight: 600;
-  }
-
-  .empty-state {
-    font-size: 0.875rem;
-    opacity: 0.6;
-    text-align: center;
-    margin-top: 2rem;
-    font-family: 'Crimson Text', serif;
-    color: #3d2817;
-  }
-
-  .party-member-card {
-    width: 100%;
-    margin-bottom: 1rem;
-    padding: 0.75rem;
-    border-radius: 4px;
-    transition: all 0.3s ease;
-    background: #e8d5c4;
-    border: 2px solid #5c4033;
-    cursor: pointer;
-  }
-
-  .party-member-card:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 3px 3px 0px rgba(61, 40, 23, 0.3);
-  }
-
-  .party-icon {
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #5c4033;
-    border: 2px solid #3d2817;
-  }
-
-  .party-player {
-    font-weight: 700;
-    font-size: 0.875rem;
-    font-family: 'Cinzel', serif;
-    color: #1a1410;
-  }
-
-  .party-name {
-    font-size: 0.75rem;
-    font-family: 'Crimson Text', serif;
-    color: #3d2817;
-  }
-
-  .party-stats {
-    font-size: 0.75rem;
-    display: flex;
-    gap: 0.75rem;
-    font-family: 'Crimson Text', serif;
-    color: #3d2817;
-  }
-
-  .sidebar-footer {
-    padding: 1rem;
-    border-top: 2px solid #5c4033;
-  }
-
-  .new-campaign-button {
-    width: 100%;
-    padding: 0.75rem 1rem;
-    border-radius: 4px;
-    font-weight: 700;
-    background: #5c4033;
-    color: #f4e7d7;
-    border: 2px solid #3d2817;
-    font-family: 'Cinzel', serif;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .new-campaign-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.4);
-  }
-
-  .menu-button {
-    position: absolute;
-    top: 1.5rem;
-    left: 1.5rem;
-    z-index: 40;
-    padding: 0.75rem;
-    border-radius: 4px;
-    background: #5c4033;
-    border: 2px solid #3d2817;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 2px 2px 0px rgba(26, 20, 16, 0.3);
-  }
-
-  .menu-button:hover {
-    transform: translateY(-2px) scale(1.05);
-    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.4);
-  }
-
-  .settings-button {
-    position: absolute;
-    top: 1.5rem;
-    right: 1.5rem;
-    z-index: 40;
-    padding: 0.75rem;
-    border-radius: 4px;
-    background: #5c4033;
-    border: 2px solid #3d2817;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 2px 2px 0px rgba(26, 20, 16, 0.3);
-  }
-
-  .settings-button:hover {
-    transform: translateY(-2px) scale(1.05);
-    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.4);
-  }
-
-  .chat-area {
-    flex: 1;
-    overflow-y: auto;
-    padding: 4rem;
-    padding-top: 6rem;
-  }
-
-  .message-text {
-    font-size: 1.25rem;
-    line-height: 1.8;
-    max-width: 42rem;
-    color: #1a1410;
-    font-family: 'Crimson Text', serif;
-    font-weight: 600;
-  }
-
-  .player-message {
-    font-weight: 500;
-    font-style: italic;
-  }
-
-  .roll-message {
-    font-weight: 700;
-    background: #e8d5c4;
-    padding: 0.5rem 0.75rem;
-    border-radius: 4px;
-    border: 2px solid #5c4033;
-  }
-
-  .roll-button {
-    padding: 1rem 2rem;
-    font-size: 1.25rem;
-    font-weight: 700;
-    border-radius: 4px;
-    transition: all 0.3s ease;
-    font-family: 'Cinzel', serif;
-    cursor: pointer;
-    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.3);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .roll-button:hover {
-    transform: translateY(-3px) scale(1.08);
-    box-shadow: 5px 5px 0px rgba(26, 20, 16, 0.4);
-  }
-
-  .roll-button.digital {
-    background: #5c4033;
-    color: #f4e7d7;
-    border: 3px solid #3d2817;
-  }
-
-  .roll-button.physical {
-    background: #6b1e1e;
-    color: #f4e7d7;
-    border: 3px solid #4a1414;
-  }
-
-  .waiting-message {
-    text-align: center;
-    margin-top: 1rem;
-    font-size: 1.125rem;
-    font-weight: 600;
-    font-style: italic;
-    font-family: 'Crimson Text', serif;
-    color: #5c4033;
-  }
-
-  .input-area {
-    padding: 2rem;
-    border-top: 4px solid #5c4033;
-    background: rgba(232, 213, 196, 0.7);
-  }
-
-  .player-selector {
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-    align-items: center;
-  }
-
-  .cycle-button {
-    padding: 0.75rem;
-    border-radius: 4px;
-    transition: all 0.3s ease;
-    background: #5c4033;
-    color: #f4e7d7;
-    border: 2px solid #3d2817;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-
-  .cycle-button:hover {
-    transform: scale(1.1) rotate(90deg);
-  }
-
-  .players-display {
-    display: flex;
-    gap: 0.5rem;
-    flex: 1;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-
-  .player-chip {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    border: 2px solid #5c4033;
-    background: #e8d5c4;
-    color: #1a1410;
-    opacity: 0.6;
-    transition: all 0.2s ease;
-  }
-
-  .player-chip.active {
-    background: #5c4033;
-    color: #f4e7d7;
-    border-color: #3d2817;
-    opacity: 1;
-  }
-
-  .player-chip span {
-    font-weight: 700;
-    font-family: 'Cinzel', serif;
-  }
-
-  .message-input {
-    flex: 1;
-    padding: 1rem 1.5rem;
-    font-size: 1.25rem;
-    border-radius: 4px;
-    background: #f4e7d7;
-    border: 2px solid #5c4033;
-    color: #1a1410;
-    font-family: 'Crimson Text', serif;
-    outline: none;
-  }
-
-  .message-input:focus {
-    border-color: #3d2817;
-    box-shadow: 0 0 0 3px rgba(92, 64, 51, 0.2);
-  }
-
-  .send-button {
-    padding: 1rem 2rem;
-    font-size: 1.25rem;
-    font-weight: 600;
-    border-radius: 4px;
-    background: #5c4033;
-    color: #f4e7d7;
-    font-family: 'Cinzel', serif;
-    border: 2px solid #3d2817;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .send-button:not(:disabled):hover {
-    transform: translateY(-2px);
-    box-shadow: 3px 3px 0px rgba(26, 20, 16, 0.4);
-  }
-
-  .send-button:disabled {
-    cursor: not-allowed;
   }
 
   @keyframes fadeIn {
