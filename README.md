@@ -1,16 +1,20 @@
 # DM Table - AI-Powered D&D Game
 
-An interactive Dungeons & Dragons digital tabletop experience powered by Claude AI as your Dungeon Master.
+An interactive Dungeons & Dragons digital tabletop experience powered by Claude AI as your Dungeon Master. Built during Calhacks 12.0 2025 hackathon.
 
 ## Features
 
-- 🎲 **AI Dungeon Master** - Claude AI generates dynamic stories and manages gameplay
-- ⚔️ **Pre-made Characters** - Choose from 6 unique characters (Fighter, Wizard, Rogue, Cleric, Barbarian, Ranger)
-- 🗺️ **Campaign Templates** - Start with The Tavern Mystery, Dragon's Peak, or Lost Temple
-- 🎯 **D20 Dice System** - Roll for ability checks with automatic modifiers
-- 💰 **Inventory Management** - Track gold, items, and equipment
-- 💾 **Save Campaigns** - Continue your adventures across sessions
-- 👥 **Multiplayer Support** - Play with 1-6 players locally
+- **AI Dungeon Master** - Claude AI generates dynamic stories and manages gameplay
+- **Pre-made Characters** - Choose from 6 unique characters (Fighter, Wizard, Rogue, Cleric, Barbarian, Ranger)
+- **Campaign Templates** - Start with The Tavern Mystery, Dragon's Peak, or Lost Temple
+- **D20 Dice System** - Roll for ability checks with automatic modifiers
+- **Inventory Management** - Track gold, items, and equipment
+- **Save Campaigns** - Continue your adventures across sessions
+- **Multiplayer Support** - Play with 1-6 players locally
+
+## External Features
+
+- **Dice Tracking Computer Vision** - Raspberry Pi Camera reads dice rolls and directly provides them to AI DM.
 
 ## Prerequisites
 
